@@ -1,0 +1,5 @@
+- model_id: google/gemma-2-2b-it
+  model_name: google/gemma-2-2b-it
+  api_base: "http://localhost:11440/v1"
+  api_key_name: "localVLLMModel"
+  aliases: ["320"]

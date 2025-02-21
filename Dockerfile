@@ -13,4 +13,8 @@ COPY funsearch ./funsearch
 
 RUN pip install --no-deps . && rm -r ./funsearch ./build
 
+RUN pip install llm-gpt4all
+
+COPY extra-openai-models.yaml /root/.config/io.datasette.llm/extra-openai-models.yaml
+
 CMD /bin/bash

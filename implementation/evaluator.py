@@ -15,23 +15,15 @@
 
 """Class for evaluating programs proposed by the Sampler."""
 import ast
-import re
 from collections.abc import Sequence
 import copy
-from typing import Any, Tuple
+from typing import Any
+import numpy as np
+from scipy.special import huber
 
-from funsearch import code_manipulation
-from funsearch import programs_database
-from funsearch import sandbox
-
-"""
-  Regex to find all methods named 'priority_vX'.
-  With each match, start from the 'def priority_vX(' and continue until there's a new line with any of
-  - a new 'def'
-  - ` or ' or # without indentation
-"""
-METHOD_MATCHER = re.compile(r"def priority_v\d\(.*?\) -> float:(?:\s*(?:[ \t]*(?!def|#|`|').*(?:\n|$)))+")
-METHOD_NAME_MATCHER = re.compile(r"priority_v\d+")
+from implementation import code_manipulation
+from implementation import programs_database
+from implementation.sfr_prediction import huber_loss  # Import the huber_loss function
 
 
 class _FunctionLineVisitor(ast.NodeVisitor):
@@ -54,34 +46,11 @@ class _FunctionLineVisitor(ast.NodeVisitor):
     return self._function_end_line
 
 
-def _find_method_implementation(generated_code: str) -> Tuple[str, str]:
-  """Find the last 'def priority_vX()' method from generated code.
-
-  Return the code and the name of the method.
-  """
-  matches = METHOD_MATCHER.findall(generated_code)
-  if not matches:
-    return "", ""
-  last_match = matches[-1]
-  name = METHOD_NAME_MATCHER.search(last_match).group()
-  return last_match, name
-
-
 def _trim_function_body(generated_code: str) -> str:
   """Extracts the body of the generated function, trimming anything after it."""
   if not generated_code:
     return ''
-  if not type(generated_code) is str:
-    generated_code = str(generated_code)
-
-  method_name = "fake_function_header"
-  # Check is the response only a continuation for our prompt or full method implementation with header
-  if "def priority_v" in generated_code:
-    code, method_name = _find_method_implementation(generated_code)
-  else:
-    code = f'def {method_name}():\n{generated_code}'
-
-  # Finally parse the code to make sure it's valid Python
+  code = f'def fake_function_header():\n{generated_code}'
   tree = None
   # We keep trying and deleting code from the end until the parser succeeds.
   while tree is None:
@@ -93,7 +62,7 @@ def _trim_function_body(generated_code: str) -> str:
     # Nothing could be saved from `generated_code`
     return ''
 
-  visitor = _FunctionLineVisitor(method_name)
+  visitor = _FunctionLineVisitor('fake_function_header')
   visitor.visit(tree)
   body_lines = code.splitlines()[1:visitor.function_end_line]
   return '\n'.join(body_lines) + '\n\n'
@@ -119,6 +88,55 @@ def _sample_to_program(
   return evolved_function, str(program)
 
 
+class Sandbox:
+  """Sandbox for executing generated code."""
+
+  def run(
+      self,
+      program: str,
+      function_to_run: str,
+      test_input: Any,
+      timeout_seconds: int,
+  ) -> tuple[Any, bool]:
+    """Returns `function_to_run(test_input)` and whether execution succeeded."""
+    try:
+      # Parse program to check for dangerous operations
+      tree = ast.parse(program)
+      
+      # Basic security check - only allow math operations
+      allowed_names = {
+          'np', 'numpy', 'math', 'exp', 'log', 'log10', 'sin', 'cos',
+          'tan', 'sqrt', 'power', 'abs', 'huber_loss', 'huber'
+      }
+      
+      for node in ast.walk(tree):
+          if isinstance(node, ast.Name) and node.id not in allowed_names:
+              if not (node.id in {'predict_log_sfr', 'evaluate_prediction'} or 
+                     node.id.startswith('predict_log_sfr_v')):
+                  return None, False
+      
+      # Create safe execution environment
+      globals_dict = {
+          'np': np,
+          'math': __import__('math'),
+          'huber': huber,
+          'huber_loss': huber_loss,
+      }
+      
+      # Execute the program
+      exec(program, globals_dict)
+      
+      # Run the evaluation function
+      if isinstance(test_input, dict):
+          result = eval(f"{function_to_run}(**{test_input})", globals_dict)
+      else:
+          result = eval(f"{function_to_run}({test_input})", globals_dict)
+      return result, True
+      
+    except Exception as e:
+        print(f"Execution failed: {e}")
+        return None, False
+
 
 def _calls_ancestor(program: str, function_to_evolve: str) -> bool:
   """Returns whether the generated function is calling an earlier version."""
@@ -138,7 +156,6 @@ class Evaluator:
   def __init__(
       self,
       database: programs_database.ProgramsDatabase,
-      sbox: sandbox.DummySandbox,
       template: code_manipulation.Program,
       function_to_evolve: str,
       function_to_run: str,
@@ -151,7 +168,7 @@ class Evaluator:
     self._function_to_run = function_to_run
     self._inputs = inputs
     self._timeout_seconds = timeout_seconds
-    self._sandbox = sbox
+    self._sandbox = Sandbox()
 
   def analyse(
       self,
@@ -162,10 +179,7 @@ class Evaluator:
     """Compiles the sample into a program and executes it on test inputs."""
     new_function, program = _sample_to_program(
         sample, version_generated, self._template, self._function_to_evolve)
-    
-    import IPython
-    IPython.embed()
-    
+
     scores_per_test = {}
     for current_input in self._inputs:
       test_output, runs_ok = self._sandbox.run(
@@ -175,6 +189,5 @@ class Evaluator:
         if not isinstance(test_output, (int, float)):
           raise ValueError('@function.run did not return an int/float score.')
         scores_per_test[current_input] = test_output
-    print(scores_per_test)
     if scores_per_test:
       self._database.register_program(new_function, island_id, scores_per_test)

@@ -119,7 +119,6 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
     function_to_run,
     inputs,
   ) for _ in range(conf.num_evaluators)]
-
   # We send the initial implementation to be analysed by one of the evaluators.
   initial = template.get_function(function_to_evolve).body
   evaluators[0].analyse(initial, island_id=None, version_generated=None)
