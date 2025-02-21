@@ -163,9 +163,6 @@ class Evaluator:
     new_function, program = _sample_to_program(
         sample, version_generated, self._template, self._function_to_evolve)
     
-    import IPython
-    IPython.embed()
-    
     scores_per_test = {}
     for current_input in self._inputs:
       test_output, runs_ok = self._sandbox.run(
