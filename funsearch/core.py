@@ -15,8 +15,10 @@
 
 """A single-threaded implementation of the FunSearch pipeline."""
 import logging
+import time
 
 from funsearch import code_manipulation
+from concurrent.futures import ThreadPoolExecutor
 
 
 def _extract_function_names(specification: str) -> tuple[str, str]:
@@ -33,18 +35,27 @@ def _extract_function_names(specification: str) -> tuple[str, str]:
 
 
 def run(samplers, database, iterations: int = -1):
-  """Launches a FunSearch experiment."""
+    """Launches a FunSearch experiment."""
+    counter = 0
+    try:
+        with ThreadPoolExecutor(max_workers=len(samplers)) as executor:
+            while iterations != 0:
+                t0 = time.time()
+                futures = [
+                    executor.submit(s.sample)
+                    for s in samplers
+                ]
+                
+                for future in futures:
+                    future.result()
+                t1 = time.time()
+                logging.info(f"Iteration: {counter}, Time taken: {t1 - t0:.3f} seconds")
+                counter += 1
+                if iterations > 0:
+                    iterations -= 1
 
-  try:
-    # This loop can be executed in parallel on remote sampler machines. As each
-    # sampler enters an infinite loop, without parallelization only the first
-    # sampler will do any work.
-    while iterations != 0:
-      for s in samplers:
-        s.sample()
-      if iterations > 0:
-        iterations -= 1
-  except KeyboardInterrupt:
-    logging.info("Keyboard interrupt. Stopping.")
-  database.backup()
+    except KeyboardInterrupt:
+        logging.info("Keyboard interrupt. Stopping.")
+    
+    database.backup()
 

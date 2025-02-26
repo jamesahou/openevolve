@@ -100,7 +100,7 @@ class ExternalProcessSandbox(DummySandbox):
 
     call_data_folder = (self.output_path / f"call{self.call_count}").absolute()
     if not call_data_folder.exists():
-      call_data_folder.mkdir()
+      call_data_folder.mkdir(exist_ok=True)
 
     input_hash = hash(test_input)
     input_path = (self.input_path / f"{input_hash}.pickle").absolute()

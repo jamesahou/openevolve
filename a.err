@@ -1,0 +1,175 @@
+INFO:root:Writing logs to data/1740608242
+INFO:absl:Best score of island 0 increased to -2.0430892156862748
+INFO:absl:Best score of island 1 increased to -2.0430892156862748
+INFO:absl:Best score of island 2 increased to -2.0430892156862748
+INFO:absl:Best score of island 3 increased to -2.0430892156862748
+INFO:absl:Best score of island 4 increased to -2.0430892156862748
+INFO:absl:Best score of island 5 increased to -2.0430892156862748
+INFO:absl:Best score of island 6 increased to -2.0430892156862748
+INFO:absl:Best score of island 7 increased to -2.0430892156862748
+INFO:absl:Best score of island 8 increased to -2.0430892156862748
+INFO:absl:Best score of island 9 increased to -2.0430892156862748
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.448834 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.398382 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.454218 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.467687 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.473648 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.490405 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.378310 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.496168 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.479063 seconds
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://localhost:11440/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+INFO:openai._base_client:Retrying request to /chat/completions in 0.406991 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.414635 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.439910 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.476690 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.482325 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.418740 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.958422 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.961845 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.809649 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.975629 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.899967 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.973980 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.826991 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.847673 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.932659 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.777955 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.766840 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.904867 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.882789 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.773991 seconds
+INFO:openai._base_client:Retrying request to /chat/completions in 0.751425 seconds
+Traceback (most recent call last):
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_sync/connection.py", line 101, in handle_request
+    raise exc
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_sync/connection.py", line 78, in handle_request
+    stream = self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_sync/connection.py", line 124, in _connect
+    stream = self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_backends/sync.py", line 207, in connect_tcp
+    with map_exceptions(exc_map):
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1003, in _request
+    response = self._client.send(
+               ^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/bin/funsearch", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/click/core.py", line 1130, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/click/core.py", line 1055, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/click/core.py", line 1657, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/click/core.py", line 1404, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/click/core.py", line 760, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/funsearch-ks-law/funsearch/__main__.py", line 135, in run
+    core.run(samplers, database, iterations)
+  File "/mnt/sdd1/jamesh/funsearch-ks-law/funsearch/core.py", line 50, in run
+    future.result()
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/funsearch-ks-law/funsearch/sampler.py", line 118, in sample
+    samples = self._llm.draw_samples(prompt.code)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/funsearch-ks-law/funsearch/sampler.py", line 75, in draw_samples
+    responses = self.client.chat.completions.create(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_utils/_utils.py", line 279, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 879, in create
+    return self._post(
+           ^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1290, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 967, in request
+    return self._request(
+           ^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1056, in _request
+    return self._retry_request(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1105, in _retry_request
+    return self._request(
+           ^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1027, in _request
+    return self._retry_request(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1105, in _retry_request
+    return self._request(
+           ^^^^^^^^^^^^^^
+  File "/mnt/sdd1/jamesh/miniconda3/envs/funsearch/lib/python3.11/site-packages/openai/_base_client.py", line 1037, in _request
+    raise APIConnectionError(request=request) from err
+openai.APIConnectionError: Connection error.

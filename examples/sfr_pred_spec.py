@@ -19,10 +19,19 @@ def evaluate(n: int) -> float:
   predictions vs real star formation rate targets."""
   
   data = pd.read_csv("examples/ks_dataset_train.csv")
-  sfr_pred = data[['log_gas', 'Redshift_NED']].apply(lambda row: priority(*row), axis=1)
-  sfr_true = data['log_SFR']
 
+  sfr_pred = []
+  sfr_true = []
+  for i, row in data.iterrows():
+    pred = priority(row['log_gas'], row['Redshift_NED'])
+    if pred is None:
+      return  -1e30 + 0.
+    
+    sfr_pred.append(pred)
+    sfr_true.append(row['log_SFR'])
+  
   loss = -huber_loss(np.array(sfr_true), np.array(sfr_pred))
+  # check if loss is nan or not a number
   if np.isnan(loss):
     loss = -1e30 + 0.
 

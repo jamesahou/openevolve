@@ -7,6 +7,8 @@ import time
 
 import click
 import llm
+from openai import OpenAI
+
 from dotenv import load_dotenv
 
 
@@ -94,9 +96,11 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
     log_path.mkdir(parents=True)
     logging.info(f"Writing logs to {log_path}")
 
-  model = llm.get_model(model_name)
-  model.key = model.get_key()
-  lm = sampler.LLM(2, model, log_path)
+  lm = sampler.vLLM(2, "token-abc123", "http://localhost:11440/v1", 
+                       "meta-llama/Llama-3.1-8B-Instruct", log_path)
+  # model = llm.get_model(model_name)
+  # model.key = model.get_key()
+  # lm = sampler.LLM(2, model, log_path)
 
   specification = spec_file.read()
   function_to_evolve, function_to_run = core._extract_function_names(specification)
