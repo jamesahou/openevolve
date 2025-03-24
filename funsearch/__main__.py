@@ -88,7 +88,7 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
   # Using OpenAI APIs with 'llm' package requires setting the variable
   # OPENAI_API_KEY=sk-...
   # See 'llm' package on how to use other providers.
-  load_dotenv()
+  # load_dotenv()
 
   timestamp = str(int(time.time()))
   log_path = pathlib.Path(output_path) / timestamp
@@ -96,8 +96,10 @@ def run(spec_file, inputs, model_name, output_path, load_backup, iterations, sam
     log_path.mkdir(parents=True)
     logging.info(f"Writing logs to {log_path}")
 
-  lm = sampler.vLLM(2, "token-abc123", "http://localhost:11440/v1", 
-                       "meta-llama/Llama-3.1-8B-Instruct", log_path)
+  # lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
+  #                      "meta-llama/Llama-3.3-70B-Instruct", log_path)
+  lm = sampler.vLLM(2, "***REMOVED***", "https://generativelanguage.googleapis.com/v1beta/openai", 
+                       "gemini-1.5-flash", log_path)
   # model = llm.get_model(model_name)
   # model.key = model.get_key()
   # lm = sampler.LLM(2, model, log_path)

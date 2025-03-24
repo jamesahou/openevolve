@@ -1,6 +1,6 @@
 import pickle
 
-db_path = "/mnt/sdd1/jamesh/funsearch-ks-law/data/backups/program_db_priority_1740104178_0.pickle"
+db_path = "../data/backups/program_db_priority_1742540183_0.pickle"
 with open(db_path, "rb") as f:
     db = pickle.load(f)
 
