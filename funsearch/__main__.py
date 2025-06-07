@@ -12,7 +12,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 
-from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator
+from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator, extractor
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -58,7 +58,8 @@ def main(ctx):
 
 
 @main.command()
-@click.argument("spec_file", type=click.File("r"))
+@click.argument("repo_dir", type=click.Path(file_okay=False))
+@click.argument("eval_file", type=click.Path(file_okay=True))
 @click.argument('inputs')
 @click.option('--model_name', default="gpt-3.5-turbo-instruct", help='LLM model')
 @click.option('--output_path', default="./data/", type=click.Path(file_okay=False), help='path for logs and data')
@@ -66,45 +67,18 @@ def main(ctx):
 @click.option('--iterations', default=-1, type=click.INT, help='Max iterations per sampler')
 @click.option('--samplers', default=15, type=click.INT, help='Samplers')
 @click.option('--sandbox_type', default="ContainerSandbox", type=click.Choice(SANDBOX_NAMES), help='Sandbox type')
-def run(spec_file, inputs, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
-  """ Execute function-search algorithm:
-
-\b
-  SPEC_FILE is a python module that provides the basis of the LLM prompt as
-            well as the evaluation metric.
-            See examples/cap_set_spec.py for an example.\n
-\b
-  INPUTS    input filename ending in .json or .pickle, or a comma-separated
-            input data. The files are expected contain a list with at least
-            one element. Elements shall be passed to the solve() method
-            one by one. Examples
-              8
-              8,9,10
-              ./examples/cap_set_input_data.json
-"""
-
-  # Load environment variables from .env file.
-  #
-  # Using OpenAI APIs with 'llm' package requires setting the variable
-  # OPENAI_API_KEY=sk-...
-  # See 'llm' package on how to use other providers.
-  # load_dotenv()
-
+def run(repo_dir, eval_file, inputs, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
   timestamp = str(int(time.time()))
   log_path = pathlib.Path(output_path) / timestamp
   if not log_path.exists():
     log_path.mkdir(parents=True)
     logging.info(f"Writing logs to {log_path}")
 
-  # lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
-  #                      "meta-llama/Llama-3.3-70B-Instruct", log_path)
-  lm = sampler.vLLM(2, "***REMOVED***", "https://generativelanguage.googleapis.com/v1beta/openai", 
-                       "gemini-1.5-flash", log_path)
-  # model = llm.get_model(model_name)
-  # model.key = model.get_key()
-  # lm = sampler.LLM(2, model, log_path)
+  lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
+                       "meta-llama/Llama-3.3-70B-Instruct", log_path)
+  
+  initial_program, func_locs = extractor.extract_code(pathlib.Path(eval_file), inputs)
 
-  specification = spec_file.read()
   function_to_evolve, function_to_run = core._extract_function_names(specification)
   template = code_manipulation.text_to_program(specification)
 
