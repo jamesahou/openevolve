@@ -22,7 +22,7 @@ import time
 import logging
 from openai import OpenAI
 
-from funsearch import evaluator
+from funsearch import evaluator2
 from funsearch import programs_database
 
 
@@ -98,12 +98,15 @@ class Sampler:
   def __init__(
       self,
       database: programs_database.ProgramsDatabase,
-      evaluators: Sequence[evaluator.Evaluator],
+      evaluators: Sequence[evaluator2.Evaluator],
       model: LLM | vLLM,
+      uid: int = 0,
   ) -> None:
     self._database = database
     self._evaluators = evaluators
     self._llm = model
+    self.uid = uid
+    self.generation_number = 0  
 
   def sample(self):
     """Continuously gets prompts, samples programs, sends them for analysis."""
@@ -122,18 +125,15 @@ class Sampler:
     # Time evaluation
     eval_times = []
     for sample in samples:
+        curr_id = str(self.uid) + "_" + str(self.generation_number)
+        self.generation_number += 1
         t0 = time.time()
         chosen_evaluator = np.random.choice(self._evaluators)
         chosen_evaluator.analyse(
-            sample, prompt.island_id, prompt.version_generated)
+            sample, prompt.island_id, curr_id)
         t1 = time.time()
         eval_times.append(t1 - t0)
     
     # Log timing results
     avg_eval_time = sum(eval_times) / len(eval_times)
-    # logging.info(f"Timing breakdown for sample:")
-    # logging.info(f"  Get prompt: {prompt_time:.3f}s")
-    # logging.info(f"  LLM sampling: {llm_time:.3f}s") 
-    # logging.info(f"  Average evaluation: {avg_eval_time:.3f}s")
-    # logging.info(f"  Total evaluation: {sum(eval_times):.3f}s")
-    # logging.info(f"  Total time: {prompt_time + llm_time + sum(eval_times):.3f}s")
+
