@@ -12,7 +12,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 
-from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator, extractor
+# from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator, extractor
+from funsearch import config, core, sandbox, sampler, programs_database_2, code_manipulation_2, evaluator2, extractor
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -58,16 +59,17 @@ def main(ctx):
 
 
 @main.command()
-@click.argument("repo_dir", type=click.Path(file_okay=False))
+@click.argument("workspace", type=click.Path(file_okay=False))
 @click.argument("eval_file", type=click.Path(file_okay=True))
 @click.argument('inputs')
+@click.option("--evolve_depth", default=-1, type=click.INT, help='How many levels to evolve the program')
 @click.option('--model_name', default="gpt-3.5-turbo-instruct", help='LLM model')
 @click.option('--output_path', default="./data/", type=click.Path(file_okay=False), help='path for logs and data')
 @click.option('--load_backup', default=None, type=click.File("rb"), help='Use existing program database')
 @click.option('--iterations', default=-1, type=click.INT, help='Max iterations per sampler')
 @click.option('--samplers', default=15, type=click.INT, help='Samplers')
 @click.option('--sandbox_type', default="ContainerSandbox", type=click.Choice(SANDBOX_NAMES), help='Sandbox type')
-def run(repo_dir, eval_file, inputs, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
+def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
   timestamp = str(int(time.time()))
   log_path = pathlib.Path(output_path) / timestamp
   if not log_path.exists():
@@ -77,10 +79,9 @@ def run(repo_dir, eval_file, inputs, model_name, output_path, load_backup, itera
   lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
                        "meta-llama/Llama-3.3-70B-Instruct", log_path)
   
-  initial_program, func_locs = extractor.extract_code(pathlib.Path(eval_file), inputs)
+  initial_program, evolve_path, loc_dict = extractor.extract_code(pathlib.Path(eval_file), inputs)
 
-  function_to_evolve, function_to_run = core._extract_function_names(specification)
-  template = code_manipulation.text_to_program(specification)
+  # template = code_manipulation_2.str_to_function()
 
   conf = config.Config(num_evaluators=1)
   database = programs_database.ProgramsDatabase(
