@@ -35,27 +35,38 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 def run(samplers, database, iterations: int = -1):
-    """Launches a FunSearch experiment."""
+    """Launches a FunSearch experiment.
+
+    Args:
+        samplers: List of sampler objects, each with a .sample() method.
+        database: Database object with a .backup() method.
+        iterations: Number of iterations to run. If -1, runs indefinitely.
+    """
     counter = 0
+
     try:
         with ThreadPoolExecutor(max_workers=len(samplers)) as executor:
             while iterations != 0:
                 t0 = time.time()
+
                 futures = [
                     executor.submit(s.sample)
                     for s in samplers
                 ]
-                
+
                 for future in futures:
                     future.result()
+
                 t1 = time.time()
-                logging.info(f"Iteration: {counter}, Time taken: {t1 - t0:.3f} seconds")
+                logging.info(
+                    f"Iteration: {counter}, Time taken: {t1 - t0:.3f} seconds"
+                )
                 counter += 1
+
                 if iterations > 0:
                     iterations -= 1
 
     except KeyboardInterrupt:
         logging.info("Keyboard interrupt. Stopping.")
-    
-    database.backup()
 
+    database.backup()
