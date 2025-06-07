@@ -1,4 +1,4 @@
-from funsearch.code_manipulation_2 import Function
+from funsearch.code_manipulation_2 import Program
 import os
 
 class ProjectIndexer:
@@ -22,7 +22,7 @@ class ProjectIndexer:
         """Extracts function definitions from the provided code."""
         raise NotImplementedError
 
-    def get_tree_description(self, functions: list[Function]) -> str:
+    def get_tree_description(self, program: Program) -> str:
         """
         Returns an indented string representation of the project structure,
         including modules, classes, methods, and functions, as specified.
