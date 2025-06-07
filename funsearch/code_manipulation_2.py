@@ -35,6 +35,7 @@ class Function:
   class_name: str = ''
   path: str = ''
   line_no: int = 0
+  qual_name: str = ''
 
   def __str__(self) -> str:
     header_str = str(self.header).strip()

@@ -54,6 +54,7 @@ def _save_sample(
     function.relative_path = func_rel_path
     function.class_name = MAP[function_name]['class']
     function.line_no = MAP[function_name]['line_no']
+    function.qual_name = function_name
 
     func_file_path = func_file_path / f"{function_name} {curr_id}"
     with open(func_file_path, "w") as f:
