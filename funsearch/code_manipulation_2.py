@@ -132,6 +132,13 @@ def str_to_function(
     raise ValueError("Expected exactly one function in the generated code.")
   return functions[0]
 
+def str_to_program(
+    generated_code: str,
+) -> Program:
+  """Given a string with code, returns a Program object."""
+  functions = str_to_functions(generated_code)
+  return Program(functions=functions)
+
 def structured_output_to_functions(
     structured_output: Dict[str, str],
 ) -> dict[str, Function]:
