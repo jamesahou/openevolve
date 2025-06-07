@@ -1,3 +1,7 @@
+# package/module1.py: ClassName.some_class_method (@classmethod)
+# package/module1.py: ClassName.some_static_method (@staticmethod)
+# package/module1.py: ClassName.some_method
+
 # ROLE
 Describe LLM role here.
 
