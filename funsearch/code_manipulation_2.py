@@ -117,9 +117,8 @@ def _str_to_functions(node: ast.AST, qualname: str = "") -> Iterable[Function]:
 
             decorators = function_node.decorator_list
 
-            if decorators:
-                top_decorator: ast.Name = decorators[0]
-                decorator = Decorator(top_decorator.id)
+            if decorators and isinstance(decorators[0], ast.Name):
+                decorator = Decorator(decorators[0].id)
             else:
                 decorator = Decorator.NONE
 
