@@ -1,0 +1,68 @@
+# ROLE
+Describe LLM role here.
+
+# FILE HIERARCHY
+├── package/
+│   ├── module1.py
+│   │   ├── class ClassName:
+│   │   │   ├── method1(self, arg)
+│   │   │   ├── @classmethod
+│   │   │   │   └── class_method(cls, arg)
+│   │   │   └── @staticmethod
+│   │   │       └── static_method(arg)
+│   │   └── function1(arg1, arg2)
+│   └── subpackage/
+│       └── module2.py
+│           └── function2(arg1)
+└── main.py
+    └── main()
+
+# IMPLEMENTATIONS
+
+```
+"""
+├── package/
+│   ├── module1.py
+│   │   ├── class ClassName:
+│   │   │   ├── method1(self, arg)
+"""
+
+def method1_v1(self, arg):
+    # ...
+
+def method1_v2(self, arg):
+    # ...
+```
+
+```
+"""
+├── package/
+│   ├── module1.py
+│   │   ├── class ClassName:
+│   │   │   ├── @classmethod
+│   │   │   │   └── class_method(cls, arg)
+"""
+
+def class_method_v1(cls, arg):
+    # ...
+
+def class_method_v2(cls, arg):
+    # ...
+```
+
+```
+"""
+├── package/
+│   ├── module1.py
+│   │   ├── class ClassName:
+│   │   │   ├── @staticmethod
+│   │   │   │   └── static_method(arg)
+"""
+
+def static_method_v1(arg):
+    # ...
+
+def static_method_v2(arg):
+    # ...
+```
+
