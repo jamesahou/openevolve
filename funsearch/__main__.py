@@ -79,35 +79,34 @@ def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, loa
   lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
                        "meta-llama/Llama-3.3-70B-Instruct", log_path)
   
-  initial_program, evolve_path, loc_dict = extractor.extract_code(pathlib.Path(eval_file), inputs)
+  eval_file = pathlib.Path(eval_file)
+  initial_program, evolve_path, program_meta = extractor.extract_code(eval_file, inputs)
 
-  # template = code_manipulation_2.str_to_function()
+  template = code_manipulation_2.str_to_program(initial_program)
 
   conf = config.Config(num_evaluators=1)
-  database = programs_database.ProgramsDatabase(
-    conf.programs_database, template, function_to_evolve, identifier=timestamp)
+  database = programs_database_2.ProgramsDatabase(
+    conf.programs_database, template, identifier=timestamp)
   if load_backup:
     database.load(load_backup)
 
   inputs = parse_input(inputs)
 
   sandbox_class = next(c for c in SANDBOX_TYPES if c.__name__ == sandbox_type)
-  evaluators = [evaluator.Evaluator(
+  evaluators = [evaluator2.Evaluator(
     database,
     sandbox_class(base_path=log_path),
     template,
-    function_to_evolve,
-    function_to_run,
+    eval_file,
     inputs,
   ) for _ in range(conf.num_evaluators)]
   # We send the initial implementation to be analysed by one of the evaluators.
-  initial = template.get_function(function_to_evolve).body
-  evaluators[0].analyse(initial, island_id=None, version_generated=None)
+  evaluators[0].analyse(initial_program, island_id=None, curr_id="-1")
   assert len(database._islands[0]._clusters) > 0, ("Initial analysis failed. Make sure that Sandbox works! "
                                                    "See e.g. the error files under sandbox data.")
 
-  samplers = [sampler.Sampler(database, evaluators, lm)
-              for _ in range(samplers)]
+  samplers = [sampler.Sampler(database, evaluators, lm, uid=i)
+              for i in range(samplers)]
 
   core.run(samplers, database, iterations)
 
@@ -119,8 +118,8 @@ def ls(db_file):
   conf = config.Config(num_evaluators=1)
 
   # A bit silly way to list programs. This probably does not work if config has changed any way
-  database = programs_database.ProgramsDatabase(
-    conf.programs_database, None, "", identifier="")
+  database = programs_database_2.ProgramsDatabase(
+    conf.programs_database, None, identifier="")
   database.load(db_file)
 
   progs = database.get_best_programs_per_island()

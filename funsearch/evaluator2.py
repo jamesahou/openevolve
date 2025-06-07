@@ -5,7 +5,7 @@ import copy
 from typing import Any, Tuple, List, Dict
 
 from funsearch import code_manipulation
-from funsearch import programs_database
+from funsearch import programs_database_2
 from funsearch import sandbox
 from funsearch.code_manipulation_2 import Program, header_from_str, structured_output_to_functions
 
@@ -67,21 +67,19 @@ class Evaluator:
 
   def __init__(
       self,
-      database: programs_database.ProgramsDatabase,
+      database: programs_database_2.ProgramsDatabase,
       sbox: sandbox.DummySandbox,
       template: code_manipulation.Program,
-      function_to_evolve: str,
-      function_to_run: str,
+      eval_file: pathlib.Path,
       inputs: Sequence[Any],
       timeout_seconds: int = 30,
   ):
     self._database = database
     self._template = template
-    self._function_to_evolve = function_to_evolve
-    self._function_to_run = function_to_run
     self._inputs = inputs
     self._timeout_seconds = timeout_seconds
     self._sandbox = sbox
+    self._eval_file = eval_file
 
   def analyse(
       self,
@@ -96,7 +94,7 @@ class Evaluator:
     scores_per_test = {}
     for current_input in self._inputs:
       test_output, runs_ok = self._sandbox.run(
-          program, self._function_to_run, current_input, self._timeout_seconds, curr_id)
+          program, self._eval_file, current_input, self._timeout_seconds, curr_id)
       if (runs_ok and test_output is not None):
         if not isinstance(test_output, (int, float)):
           raise ValueError('@function.run did not return an int/float score.')
