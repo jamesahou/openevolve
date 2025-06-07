@@ -4,6 +4,7 @@ import ast
 import textwrap
 from typing import List, Tuple, Sequence, Any, Dict
 import re
+from enum import Enum
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -25,6 +26,16 @@ class FuncHeader:
   def __hash__(self):
     return hash(str(self))
 
+class FuncType(Enum):
+   DEFAULT = 'default'
+   CLASS = 'class'
+   STATIC = 'static'
+   PROPERTY = 'property'
+   
+   def __str__(self) -> str:
+     """Return the function type as a string."""
+     return self.value
+
 @dataclasses.dataclass
 class Function:
   """A parsed Python function."""
@@ -36,6 +47,7 @@ class Function:
   path: str = ''
   line_no: int = 0
   qual_name: str = ''
+  type: FuncType = FuncType.DEFAULT
 
   def __str__(self) -> str:
     header_str = str(self.header).strip()
