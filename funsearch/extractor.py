@@ -191,7 +191,8 @@ class Extractor:
 
         return self.trace
 
-    def run(self, file: Path, script_args: list):
+    def run(self, file: Path, script_args: list, depth: int=-1):
+        assert(depth >= -1 and isinstance(depth, int))
         self.script_path = file.resolve()
         self.base_dir = self.script_path.parent
         print("base_dir", self.base_dir)
@@ -244,13 +245,9 @@ class Extractor:
         func_header = dict()
         spec_code = []
         # Extract the code in the order of the path
-        for qualname in path:
+        for qualname in path[-depth:]:
             file_path, line_no, _ = builtins._dbg_storage["fn_locs"][qualname]
             code, class_name, header = self.extract_function_code(self.base_dir / file_path, qualname)
-            if qualname in opt_qualnames:
-                code = code.replace("def ", f"@funsearch.evolve\ndef ", 1)
-            elif qualname in watch_qualnames:
-                code = code.replace("def ", f"@funsearch.run\ndef ", 1)
             location_comment = f"# Location: {file_path}:{line_no}"
             if class_name:
                 location_comment += f" | Class: {class_name}"
@@ -275,15 +272,15 @@ class Extractor:
                 "header": func_header.get(qualname, None),
                 "qualname": qualname
             }
-            for qualname in path
+            for qualname in path[-depth:]
             for (file_path, line_no, _) in [builtins._dbg_storage["fn_locs"][qualname]]
         }
 
-        return spec_code_str, path, loc_dict
+        return spec_code_str, path[-depth:], loc_dict
 
-def extract_code(eval_file: Path, args: list) -> str:
+def extract_code(eval_file: Path, args: list, depth=-1) -> str:
     extractor = Extractor()
-    spec_code_str, path, loc_dict = extractor.run(eval_file, args)
+    spec_code_str, path, loc_dict = extractor.run(eval_file, args, depth=depth)
     return spec_code_str, path, loc_dict
 
 def add_decorators(loc_dict, decorator="@funsearch.hotswap"):
