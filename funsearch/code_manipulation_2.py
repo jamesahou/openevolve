@@ -107,12 +107,40 @@ def _str_to_functions(node: ast.AST, qualname: str = "") -> Iterable[Function]:
         elif isinstance(child, ast.FunctionDef):
             function_node: ast.FunctionDef = child
 
+            args = []
+
+            pos_args = function_node.args.args
+            pos_defaults = function_node.args.defaults
+            pos_default_start = len(pos_args) - len(pos_defaults)
+
+            for i, arg in enumerate(pos_args):
+              if i < pos_default_start:
+                args.append(arg.arg)
+              else:
+                default_value = ast.unparse(pos_defaults[i - pos_default_start])
+                args.append(f"{arg.arg}={default_value}")
+
+            kwonly_args = function_node.args.kwonlyargs
+            kw_defaults = function_node.args.kw_defaults
+
+            for i, arg in enumerate(kwonly_args):
+              if i < len(kw_defaults) and kw_defaults[i] is not None:
+                default_value = ast.unparse(kw_defaults[i])
+                args.append(f"{arg.arg}={default_value}")
+              else:
+                args.append(arg.arg)
+
+            if function_node.args.vararg:
+              args.append(f"*{function_node.args.vararg.arg}")
+            if function_node.args.kwarg:
+              args.append(f"**{function_node.args.kwarg.arg}")
+
             header = FuncHeader(
-                name=function_node.name,
-                args=[arg.arg for arg in function_node.args.args],
-                return_type=(
-                    ast.unparse(function_node.returns) if function_node.returns else ""
-                ),
+              name=function_node.name,
+              args=args,
+              return_type=(
+                ast.unparse(function_node.returns) if function_node.returns else ""
+              ),
             )
 
             decorators = function_node.decorator_list
