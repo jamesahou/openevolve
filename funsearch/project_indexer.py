@@ -22,8 +22,8 @@ class Node:
         yield from self.children.values()
 
 class FileNode(Node):
-    def __str__(self, prefix=""):
-        return f"{prefix}{self.name} ({self.qual_name})\n"
+    def __str__(self):
+        return self.name
 
 class FolderNode(Node):
     def __str__(self):
@@ -40,18 +40,15 @@ class FunctionNode(Node):
         self.function = function
 
     def __str__(self):
-        return self.function.name + '(' + ', '.join(arg.name for arg in self.function.header.args) + ')'
+        return self.function.name + '(' + ', '.join(self.function.header.args) + ')'
 
 class ProjectTree:
     def __init__(self, project_root: str):
-        self.project_root = project_root
-        self.tree = FolderNode("root")
+        self.tree = FolderNode(project_root)
 
     def insert_function(self, function: Function) -> FunctionNode:
         # Parse the relative path of the function
-        rel_path = os.path.relpath(function.path, self.project_root)
-
-        path_parts = rel_path.split(os.sep)
+        path_parts = function.path.split(os.sep)
         qual_parts = function.qual_name.split('.')
         
         # Start at the root of the tree
@@ -125,14 +122,13 @@ class ProjectTree:
         return _pretty_print(self.tree)
 
 class ProjectIndexer:
-    def __new__(cls, project_root: str):
-        cls.project_root = project_root
-        cls.project_tree = ProjectTree(project_root)
-        cls._build_project_tree()
+    def __init__(self, project_root: str):
+        self.project_root = project_root
+        self.project_tree = ProjectTree(project_root)
+        self._build_project_tree()
 
-    @classmethod
-    def _build_project_tree(cls):
-        for dirpath, _, filenames in os.walk(cls.project_root):
+    def _build_project_tree(self):
+        for dirpath, _, filenames in os.walk(self.project_root):
             for filename in filenames:
                 if filename.endswith(".py"):
                     # Read the file content
@@ -144,11 +140,15 @@ class ProjectIndexer:
                     # Extract all functions from the code string
                     program = Program.from_code(code)
 
+                    # Write the filepath to each function in the program
+                    for function in program.functions:
+                        function.path = os.path.relpath(filepath, self.project_root)
+
                     # Insert each function into the project tree
                     for function in program.functions:
-                        cls.project_tree.insert_function(function)
+                        self.project_tree.insert_function(function)
 
-    def get_tree_description(cls, program: Program) -> str:
+    def get_tree_description(self, program: Program) -> str:
         """
         Returns an indented string representation of the project structure,
         including modules, classes, methods, and functions, as specified.
@@ -171,7 +171,7 @@ class ProjectIndexer:
             └── main()
         """
         # Build a subtree of the project tree for the given program
-        subtree = ProjectTree(cls.project_root)
+        subtree = ProjectTree(self.project_root)
 
         for function in program.functions:
             subtree.insert_function(function)
@@ -180,6 +180,6 @@ class ProjectIndexer:
         
 if __name__ == "__main__":
     # Example usage
-    project_root = "example_project/"
+    project_root = "example_project"
     indexer = ProjectIndexer(project_root)
     print(indexer.project_tree.pretty_print())
