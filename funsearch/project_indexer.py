@@ -43,8 +43,8 @@ class FunctionNode(Node):
         return self.function.name + '(' + ', '.join(self.function.header.args) + ')'
 
 class ProjectTree:
-    def __init__(self, project_root: str):
-        self.tree = FolderNode(project_root)
+    def __init__(self):#, project_root: str):
+        self.tree = FolderNode("")
 
     def insert_function(self, function: Function) -> FunctionNode:
         # Parse the relative path of the function
@@ -104,15 +104,9 @@ class ProjectTree:
             └── main()
         """
         def _pretty_print(node: Node, prefix: str = "", is_last: bool = True) -> str:
-            result = ""
-            if isinstance(node, FileNode):
-                result += f"{prefix}{TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value}{node}\n"
-            elif isinstance(node, FolderNode):
-                result += f"{prefix}{TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value}{node}\n"
-            elif isinstance(node, ClassNode):
-                result += f"{prefix}{TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value}{node}\n"
-            elif isinstance(node, FunctionNode):
-                result += f"{prefix}{TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value}{node}\n"
+            branch_symbol = TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value
+
+            result = f"{prefix}{branch_symbol}{node}\n"
 
             children = list(node.get_children())
             for i, child in enumerate(children):
@@ -148,7 +142,8 @@ class ProjectIndexer:
                     for function in program.functions:
                         self.project_tree.insert_function(function)
 
-    def get_tree_description(self, program: Program) -> str:
+    @classmethod
+    def get_tree_description(cls, program: Program) -> str:
         """
         Returns an indented string representation of the project structure,
         including modules, classes, methods, and functions, as specified.
@@ -171,7 +166,7 @@ class ProjectIndexer:
             └── main()
         """
         # Build a subtree of the project tree for the given program
-        subtree = ProjectTree(self.project_root)
+        subtree = ProjectTree()
 
         for function in program.functions:
             subtree.insert_function(function)
