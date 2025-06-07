@@ -26,15 +26,11 @@ class FuncHeader:
   def __hash__(self):
     return hash(str(self))
 
-class FuncType(Enum):
-   DEFAULT = 'default'
-   CLASS = 'class'
-   STATIC = 'static'
-   PROPERTY = 'property'
-   
-   def __str__(self) -> str:
-     """Return the function type as a string."""
-     return self.value
+class Decorator(Enum):
+   NONE = ""
+   CLASSMETHOD = "@classmethod"
+   STATICMETHOD = "@staticmethod"
+   PROPERTY = "@property"
 
 @dataclasses.dataclass
 class Function:
@@ -47,7 +43,7 @@ class Function:
   path: str = ''
   line_no: int = 0
   qual_name: str = ''
-  type: FuncType = FuncType.DEFAULT
+  decorator: Decorator = Decorator.NONE
 
   def __str__(self) -> str:
     header_str = str(self.header).strip()
