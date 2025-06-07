@@ -51,7 +51,7 @@ def _save_sample(
     func_file_path = IMPS_PATH / func_rel_path 
     os.makedirs(func_file_path, exist_ok=True)
 
-    function.relative_path = func_rel_path
+    function.relative_path = str(func_rel_path)
     function.class_name = MAP[function_name]['class']
     function.line_no = MAP[function_name]['line_no']
     function.qual_name = function_name
