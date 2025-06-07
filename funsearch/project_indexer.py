@@ -9,6 +9,7 @@ class TreeSymbol(Enum):
     LAST_BRANCH = '└── '
     VERTICAL = '│   '
     HORIZONTAL = '── '
+    BLANK = '    '
 
 class Node:
     def __init__(self, name: str):
@@ -33,6 +34,10 @@ class ClassNode(Node):
     def __str__(self):
         return f"class {self.name}:"
 
+class DecoratorNode(Node):
+    def __str__(self):
+        return f"@{self.name}"
+
 class FunctionNode(Node):
     def __init__(self, name: str, function: Function):
         self.name = name
@@ -44,12 +49,12 @@ class FunctionNode(Node):
 
 class ProjectTree:
     def __init__(self):#, project_root: str):
-        self.tree = FolderNode("")
+        self.tree = FolderNode("project")
 
     def insert_function(self, function: Function) -> FunctionNode:
         # Parse the relative path of the function
         path_parts = function.path.split(os.sep)
-        qual_parts = function.qual_name.split('.')
+        qual_parts = function.qualname.split('.')
         
         # Start at the root of the tree
         node = self.tree
@@ -78,6 +83,10 @@ class ProjectTree:
             node = node.add_child(class_node)
         
         # Insert the function node into the class or file node
+        if function.decorator != Decorator.NONE:
+            decorator_node = DecoratorNode(function.decorator.value)
+            node = node.add_child(decorator_node)
+
         function_node = FunctionNode(method_name, function)
         node.add_child(function_node)
         assert node.children[method_name] == function_node, f"Function node {method_name} already exists in {node.name}"
@@ -104,13 +113,17 @@ class ProjectTree:
             └── main()
         """
         def _pretty_print(node: Node, prefix: str = "", is_last: bool = True) -> str:
-            branch_symbol = TreeSymbol.LAST_BRANCH.value if is_last else TreeSymbol.BRANCH.value
-
-            result = f"{prefix}{branch_symbol}{node}\n"
+            branch_symbol = TreeSymbol.LAST_BRANCH if is_last else TreeSymbol.BRANCH
+            prefix_symbol = TreeSymbol.BLANK if is_last else TreeSymbol.VERTICAL
+            
+            result = f"{prefix}{branch_symbol.value}{node}\n"
+            prefix = prefix + prefix_symbol.value
 
             children = list(node.get_children())
+            
             for i, child in enumerate(children):
-                result += _pretty_print(child, prefix + (TreeSymbol.VERTICAL.value if not is_last else "    "), i == len(children) - 1)
+                result += _pretty_print(child, prefix, i == len(children) - 1)
+
             return result
 
         return _pretty_print(self.tree)
@@ -118,7 +131,7 @@ class ProjectTree:
 class ProjectIndexer:
     def __init__(self, project_root: str):
         self.project_root = project_root
-        self.project_tree = ProjectTree(project_root)
+        self.project_tree = ProjectTree()
         self._build_project_tree()
 
     def _build_project_tree(self):
