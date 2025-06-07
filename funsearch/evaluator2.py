@@ -14,10 +14,7 @@ import ast
 import os
 import textwrap
 
-CODEBASE = ""
-IMPS_PATH = pathlib.Path() / CODEBASE
 
-MAP = {} # maps rel func name -> {'file_path': , 'function_name':  , 'line_no': , 'class': , 'header': }
 
 def get_relative_path(absolute_path: pathlib.Path, project_root: str) -> pathlib.Path:
     """Get the file path of the provided function relative to the project root."""
@@ -26,18 +23,21 @@ def get_relative_path(absolute_path: pathlib.Path, project_root: str) -> pathlib
 
 def _save_sample(
     sample: Dict[str, str],
+    workspace: pathlib.Path,
+    imps_path: pathlib.Path,
+    program_meta: Dict[str, Any],
     curr_id: str,
 ) -> Program:
   """Given sampler code in structured format, saves it in the implementation dir by current ID. Save in form accessible to decorator"""
   
   # Check if the sample contains all the expected keys
-  expected_names = set(MAP.keys())
+  expected_names = set(program_meta.keys())
   if not set(sample.keys()) == expected_names:
     raise ValueError(f"Sample keys do not match expected function names. Expected: {expected_names}, got: {sample.keys()}")
 
   functions = structured_output_to_functions(sample)
   func_headers = [str(f.header) for f in functions.values()]
-  expected_headers = [str(header_from_str(MAP[name]['header'])) for name in expected_names]
+  expected_headers = [str(header_from_str(program_meta[name]['header'])) for name in expected_names]
 
   # check if headers are same
   if set(func_headers) != set(expected_headers):
@@ -46,14 +46,14 @@ def _save_sample(
   for function_name, function in functions.items():
     function_body = textwrap.dedent(function.body).strip() + '\n'
 
-    func_abs_path = pathlib.Path(MAP[function_name]['file_path'])
-    func_rel_path = get_relative_path(func_abs_path, CODEBASE)
-    func_file_path = IMPS_PATH / func_rel_path 
+    func_abs_path = pathlib.Path(program_meta[function_name]['file_path'])
+    func_rel_path = get_relative_path(func_abs_path, workspace)
+    func_file_path = imps_path / func_rel_path 
     os.makedirs(func_file_path, exist_ok=True)
 
     function.relative_path = str(func_rel_path)
-    function.class_name = MAP[function_name]['class']
-    function.line_no = MAP[function_name]['line_no']
+    function.class_name = program_meta[function_name]['class']
+    function.line_no = program_meta[function_name]['line_no']
     function.qual_name = function_name
 
     func_file_path = func_file_path / f"{function_name} {curr_id}"
@@ -70,7 +70,10 @@ class Evaluator:
       database: programs_database_2.ProgramsDatabase,
       sbox: sandbox.DummySandbox,
       template: code_manipulation.Program,
+      workspace: pathlib.Path,
       eval_file: pathlib.Path,
+      imps_path: pathlib.Path,
+      program_meta: Dict[str, Any],
       inputs: Sequence[Any],
       timeout_seconds: int = 30,
   ):
@@ -80,6 +83,9 @@ class Evaluator:
     self._timeout_seconds = timeout_seconds
     self._sandbox = sbox
     self._eval_file = eval_file
+    self._imps_path = imps_path
+    self._program_meta = program_meta
+    self._workspace = workspace
 
   def analyse(
       self,
@@ -89,7 +95,7 @@ class Evaluator:
   ) -> None:
     """Compiles the sample into a program and executes it on test inputs."""
     
-    program = _save_sample(sample, curr_id)
+    program = _save_sample(sample, self._workspace, self._imps_path, self._program_meta, curr_id)
 
     scores_per_test = {}
     for current_input in self._inputs:

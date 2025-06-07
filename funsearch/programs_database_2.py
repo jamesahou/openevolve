@@ -28,6 +28,7 @@ import scipy
 
 from funsearch import code_manipulation
 from funsearch import config as config_lib
+from funsearch.project_indexer import ProjectIndexer
 
 Signature = tuple[float, ...]
 ScoresPerTest = Mapping[Any, float]
@@ -85,6 +86,8 @@ class ProgramsDatabase:
   ) -> None:
     self._config: config_lib.ProgramsDatabaseConfig = config
     self._template: code_manipulation.Program = template
+    
+    indexer = ProjectIndexer(config.project_root)
 
     # Initialize empty islands.
     self._islands: list[Island] = []

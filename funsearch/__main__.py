@@ -78,6 +78,11 @@ def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, loa
 
   lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
                        "meta-llama/Llama-3.3-70B-Instruct", log_path)
+  workspace = pathlib.Path(workspace)
+  imps_path = pathlib.Path(f"imps_{timestamp}")
+  if not imps_path.exists():
+    imps_path.mkdir(parents=True)
+    logging.info(f"Writing implementations to {imps_path}")
   
   eval_file = pathlib.Path(eval_file)
   initial_program, evolve_path, program_meta = extractor.extract_code(eval_file, inputs)
@@ -97,7 +102,10 @@ def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, loa
     database,
     sandbox_class(base_path=log_path),
     template,
+    workspace,
     eval_file,
+    imps_path,
+    program_meta,
     inputs,
   ) for _ in range(conf.num_evaluators)]
   # We send the initial implementation to be analysed by one of the evaluators.
