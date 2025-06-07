@@ -2,7 +2,7 @@ import dataclasses
 import io
 import ast
 import textwrap
-from typing import List, Tuple, Sequence, Any
+from typing import List, Tuple, Sequence, Any, Dict
 import re
 
 @dataclasses.dataclass
@@ -34,6 +34,7 @@ class Function:
   body: str
   class_name: str = ''
   path: str = ''
+  line_no: int = 0
 
   def __str__(self) -> str:
     header_str = str(self.header).strip()
@@ -81,34 +82,54 @@ class Program:
     """
     return '\n\n'.join(f.to_str(version) for f in self.functions)
 
-def str_to_functions(
+def str_to_functions(generated_code: str) -> List[Function]:
+    """Given a string with code, returns a list of Function objects."""
+    tree = ast.parse(generated_code)
+    lines = generated_code.splitlines()
+    functions: List[Function] = []
+
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+
+        start_idx = node.lineno - 1
+        header_parts: List[str] = []
+        for i in range(start_idx, len(lines)):
+            part = lines[i].strip()
+            header_parts.append(part)
+            if part.endswith(":"):
+                break
+        else:
+            raise ValueError(f"Could not locate end of definition for function {node.name!r}")
+
+        header_line = " ".join(header_parts)
+        header = header_from_str(header_line)
+
+        body_start = node.body[0].lineno - 1 if node.body else start_idx + len(header_parts)
+        end = node.end_lineno
+        body_lines = lines[body_start:end]
+        body = "\n".join(body_lines).rstrip("\n")
+
+        functions.append(Function(name=node.name, header=header, body=body))
+
+    return functions
+
+def str_to_function(
     generated_code: str,
-) -> List[Function]:
-  """Given a string with code, returns a list of tuples with function name (__qualname__) and body."""
-  tree = ast.parse(generated_code)
-  lines = generated_code.splitlines()
-  functions: List[Function] = []
+) -> Function:
+  """Given a string with code, returns a single Function object."""
+  functions = str_to_functions(generated_code)
+  if len(functions) != 1:
+    raise ValueError("Expected exactly one function in the generated code.")
+  return functions[0]
 
-  for node in tree.body:
-    if not isinstance(node, ast.FunctionDef):  
-      continue
-
-    start = node.lineno - 1                     
-    body_start = node.body[0].lineno - 1 if node.body else start
-    end = node.end_lineno                        
-    body_lines = lines[body_start:end]
-    body = "\n".join(body_lines).rstrip("\n")
-
-    header = FuncHeader(
-        name=node.name,
-        args=[arg.arg for arg in node.args.args],
-        return_type=node.returns.id if node.returns else ''
-    )
-
-    func = Function(name=node.name, header=header, body=body)
-
-    functions.append(func)
-
+def structured_output_to_functions(
+    structured_output: Dict[str, str],
+) -> dict[str, Function]:
+  """Given a structured output from the LLM, returns a list of Function objects."""
+  functions: Dict[str, Function] = {}
+  for func_name, body in structured_output.items():
+      functions[func_name] = str_to_function(body)
   return functions
 
 def header_from_str(header_str: str) -> FuncHeader:
