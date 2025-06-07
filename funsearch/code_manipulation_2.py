@@ -4,6 +4,7 @@ import ast
 import textwrap
 from typing import List, Tuple, Sequence, Any, Dict
 import re
+from enum import Enum
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -25,6 +26,12 @@ class FuncHeader:
   def __hash__(self):
     return hash(str(self))
 
+class Decorator(Enum):
+   NONE = ""
+   CLASSMETHOD = "@classmethod"
+   STATICMETHOD = "@staticmethod"
+   PROPERTY = "@property"
+
 @dataclasses.dataclass
 class Function:
   """A parsed Python function."""
@@ -35,6 +42,8 @@ class Function:
   class_name: str = ''
   path: str = ''
   line_no: int = 0
+  qual_name: str = ''
+  decorator: Decorator = Decorator.NONE
 
   def __str__(self) -> str:
     header_str = str(self.header).strip()
