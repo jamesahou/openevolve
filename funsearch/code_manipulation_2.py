@@ -91,6 +91,12 @@ class Program:
     """
     return '\n\n'.join(f.to_str(version) for f in self.functions)
 
+  @classmethod
+  def from_code(cls, code: str) -> "Program":
+    """Parse a Python program from a string."""
+    functions = str_to_functions(code)
+    return Program(functions=functions)
+
 def str_to_functions(generated_code: str) -> List[Function]:
     """Given a string with code, returns a list of Function objects."""
     tree = ast.parse(generated_code)
