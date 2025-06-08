@@ -240,10 +240,10 @@ class ContainerSandbox(DummySandbox):
 
         Args:
             workspace_path (pathlib.Path): The absolute path to the modified workspace root on the host.
-            eval_file (pathlib.Path): The path to the evaluation entry point Python file on the host.
-            implementations_path (pathlib.Path): The path to the implementations directory on the host.
+            eval_file (pathlib.Path): The absolute path to the evaluation entry point Python file on the host.
+            implementations_path (pathlib.Path): The absolute path to the implementations directory on the host.
             python_path (str): The path to the Python interpreter to use. Defaults to "python".
-            setup_file (pathlib.Path | None): The path to the setup file for installation, located on the host. This will be copied to the container.
+            setup_file (pathlib.Path | None): The absolute path to the setup file for installation, located on the host. This will be copied to the container.
         """
         super().__init__()
 
