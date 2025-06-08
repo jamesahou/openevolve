@@ -7,7 +7,7 @@ import textwrap
 from typing import List, Tuple, Sequence, Any, Dict, Iterable
 import re
 from enum import Enum
-from types import FullName
+from types import FullName, FuncMeta
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -191,7 +191,7 @@ def structured_output_to_functions(
     structured_output: ProgramImplementation,
 ) -> dict[FullName, Function]:
     """Given a structured output from the LLM, returns a mapping from function qualnames to Function objects."""
-    functions: Dict[str, Function] = {}
+    functions: Dict[FullName, Function] = {}
     for structured_function in structured_output.functions:
         function = str_to_function(structured_function.code)
         function.path = structured_function.filepath
@@ -206,7 +206,7 @@ def header_from_str(header_str: str) -> FuncHeader:
 
 def structured_output_to_prog_meta(
     structured_output: ProgramImplementation,
-    program_meta: Dict[FullName, Any],
+    program_meta: Dict[FullName, FuncMeta],
 ) -> Program:
     """Given a structured output from the LLM and program metadata, returns a Program object."""
 
@@ -221,7 +221,23 @@ def structured_output_to_prog_meta(
     functions = structured_output_to_functions(structured_output)
     
     # check if headers are same
-    expected_headers
+    expected_headers = {str(header_from_str(meta.header)) for meta in program_meta.values()}
+    actual_headers = {str(func.header) for func in functions.values()}
+    if expected_headers != actual_headers:
+        raise ValueError(
+            f"Expected headers {expected_headers} but got {actual_headers} in structured output."
+        )
+    
+    # Set the metadata for each function
+    for func in functions.values():
+        meta = program_meta[func.path + ' ' + func.qualname]
+        func.line_no = meta.line_no
+        func.qualname = meta.qualname
+
+    return Program(functions=list(functions.values()))
+  
+
+
 
 
     
