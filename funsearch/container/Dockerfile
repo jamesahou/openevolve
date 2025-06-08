@@ -27,15 +27,15 @@ ARG PYTHON_VERSION=3.11.6
 # Use the official Python image as the base image
 FROM docker.io/python:${PYTHON_VERSION}
 
-# The path to the workspace directory on the host file system
-ARG WORKSPACE_ROOT
+# The absolute path to the project root directory on the host file system
+ARG PROJECT_ROOT
 # The setup file will get run from without the workspace directory
 ARG SETUP_FILE
 # The evaluation entry point script
 ARG EVAL_FILE
 
 COPY ${SETUP_FILE} /setup.sh
-COPY ${WORKSPACE_ROOT} /workspace
+COPY ${PROJECT_ROOT} /workspace
 COPY ${EVAL_FILE} /eval.py
 
 COPY ./funsearch/container/main.py /main.py
