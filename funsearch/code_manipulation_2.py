@@ -207,3 +207,41 @@ def header_from_str(header_str: str) -> FuncHeader:
     return_type = match.group(3) or ""
 
     return FuncHeader(name=name, args=args, return_type=return_type)
+
+def structured_output_to_prog_meta(
+    structured_output: Dict[str, str],
+    program_meta: Dict[str, Any],
+) -> Program:
+    """Given a structured output from the LLM and program metadata, returns a Program object."""
+
+    # Check if the sample contains all the expected keys
+    expected_names = set(program_meta.keys())
+    if not set(structured_output.keys()) == expected_names:
+        raise ValueError(
+            f"Sample keys do not match expected function names. Expected: {expected_names}, got: {sample.keys()}"
+        )
+
+    functions = structured_output_to_functions(structured_output)
+    func_headers = [str(f.header) for f in functions.values()]
+    expected_headers = [
+        str(header_from_str(program_meta[name]["header"])) for name in expected_names
+    ]
+
+    # check if headers are same
+    if set(func_headers) != set(expected_headers):
+        raise ValueError(
+            f"Function headers do not match expected headers. Expected: {expected_headers}, got: {func_headers}"
+        )
+
+    functions = structured_output_to_functions(structured_output)
+
+    for func_name, function in functions.items():
+        if func_name not in program_meta:
+            raise ValueError(f"Function {func_name} not found in program metadata.")
+        meta = program_meta[func_name]
+        function.path = meta["file_path"]
+        function.line_no = meta["line_no"]
+        function.qualname = func_name
+
+    return Program(functions=list(functions.values()))
+  
