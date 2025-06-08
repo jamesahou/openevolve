@@ -10,6 +10,8 @@ import os
 from collections import deque
 import ast
 
+from funsearch.structured_outputs import ProgramImplementation, FunctionImplementation
+
 if sys.version_info >= (3, 12):
     from sys import monitoring
 
@@ -244,7 +246,7 @@ class Extractor:
         func_class = dict()
         func_header = dict()
         spec_code = []
-        spec_structured = {}
+        spec_structured = []
         # Extract the code in the order of the path
         for qualname in path[-depth:]:
             file_path, line_no, _ = builtins._dbg_storage["fn_locs"][qualname]
@@ -253,11 +255,15 @@ class Extractor:
             if class_name:
                 location_comment += f" | Class: {class_name}"
             spec_code.append(f"{location_comment}\n{code}")
-            spec_structured[qualname] = code
+            
+            spec_structured.append(FunctionImplementation(filepath=file_path, qualname=qualname, code=code))
 
             func_class[qualname] = class_name
             func_header[qualname] = header
         
+        spec_structured = ProgramImplementation(
+            functions=spec_structured)
+
         # Write the code to a file
         spec_code_str = "\n\n".join(spec_code)
         spec_code_str = f"# Minimal code path from {watch_qualnames} to {opt_qualnames}\n\n{spec_code_str}"
@@ -278,10 +284,10 @@ class Extractor:
             for qualname in path[-depth:]
             for (file_path, line_no, _) in [builtins._dbg_storage["fn_locs"][qualname]]
         }
-
+        
         return spec_structured, path[-depth:], loc_dict
 
-def extract_code(eval_file: Path, args: list, depth=-1) -> str:
+def extract_code(eval_file: Path, args: list, depth=-1):
     extractor = Extractor()
     spec_structured, path, loc_dict = extractor.run(eval_file, args, depth=depth)
     return spec_structured, path, loc_dict

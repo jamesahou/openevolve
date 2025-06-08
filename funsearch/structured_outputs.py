@@ -10,6 +10,9 @@ class FunctionImplementation(BaseModel):
     qualname: str = Field(
         description="The qualified name of the function (e.g. MyClass.myfunction)."
     )
+    code: str = Field(
+        description="The source code of the function implementation."
+    )
 
 class ProgramImplementation(BaseModel):
     """
