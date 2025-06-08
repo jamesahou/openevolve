@@ -77,13 +77,19 @@ class vLLM:
         self.log_path = log_path
         self.model = model
         self.prompt_count = 0
-
+        sys_prompt_path = current_dir / "systemprompt.txt"
+        if sys_prompt_path.exists():
+            with open(sys_prompt_path, "r") as f:
+                self.system_prompt = f.read().strip()
+        else:
+            raise FileNotFoundError(f"System prompt file not found at {sys_prompt_path}")
+        
     def draw_samples(self, prompt: str) -> list[ProgramImplementation | None]:
         """Batch processes multiple prompts at once."""
         responses = self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You are an expert iterative code-evolution assistant. For each provided function analyse the existing version(s) and improve them, optimize for clarity, performance, and correctness while preserving the existing codebase structure. NEVER CHANGE THE FUNCTION NAME OR HEADER."},
+                {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": prompt},
             ],
             response_format=ProgramImplementation,
