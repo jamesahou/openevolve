@@ -15,15 +15,11 @@ from funsearch import sandbox
 from funsearch.structured_outputs import ProgramImplementation
 from funsearch.test_case import TestCase
 
-from typing import Any, Tuple, List, Dict
+from typing import Any, Dict
 from collections.abc import Sequence
 
-import textwrap
 import pathlib
-import copy
-import ast
 import os
-import re
 
 class ImplementationsManager:
     """Class that manages implementations of programs."""
