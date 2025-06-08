@@ -2,7 +2,7 @@ from typing import TypeAlias, Any
 import dataclasses
 from pathlib import Path
 
-# An annotation for full names (abspath + space + qualname)
+# An annotation for full names (relpath + space + qualname)
 FullName: TypeAlias = str
 
 # Path types
