@@ -18,74 +18,6 @@ CONTAINER_MAIN = "/main.py"
 IMAGE_NAME = "funsearch_sandbox"
 CONTAINER_NAME = "funsearch_container"
 
-class DummySandbox:
-    """
-    Base class for Sandboxes that execute the generated code.
-
-    Note: this base class executes the code but does not offer any sandboxing!!!
-    It should be only used in unit testing or debugging, and not with real LLM
-    unless the host environment is in some kind of sandbox itself.
-    Even in sandboxed host, the executed code could theoretically affect later executions.
-    """
-    sandboxes = 0
-
-    def __init__(self, **kwargs):
-        self.id = self.register_sandbox()
-
-    def register_sandbox(self) -> int:
-        """Register this sandbox in the global list of sandboxes."""
-        sandbox_id = DummySandbox.sandboxes
-        DummySandbox.sandboxes += 1
-        return sandbox_id
-
-    def run(
-        self,
-        code: str,
-        function_name: str,
-        test_case: TestCase,
-    ) -> tuple[Any, bool]:
-        """
-        Executes a specified function from dynamically compiled code with given arguments.
-
-        Args:
-            code (str): The source code containing the function to execute.
-            function_name (str): The name of the function to invoke from the compiled code.
-            test_case (TestCase): The test case containing input arguments and keyword arguments.
-
-        Returns:
-            tuple[Any, bool]: The result of the function execution and a boolean flag indicating success.
-
-        Raises:
-            KeyError: If the specified function is not found in the compiled namespace.
-            Exception: Propagates any exception raised during function execution.
-        """
-
-        # The same "program" seems to be now repeatedly parsed using AST and then compiled.
-        # This could probably be simplified quite a bit.
-        namespace = DummySandbox.compile(code)
-        args = test_case.args
-        kwargs = test_case.kwargs
-        return namespace[function_name](*args, **kwargs)
-
-    @staticmethod
-    def compile(code: str):
-        """
-        Compiles and executes the given Python code string in a new namespace.
-
-        Args:
-            code (str): The Python source code to compile and execute.
-
-        Returns:
-            dict: The namespace dictionary containing the variables and functions defined by the executed code.
-        """
-        namespace = {}
-
-        parsed_code = ast.parse(code)
-        compiled_code = compile(parsed_code, filename="<ast>", mode="exec")
-        exec(compiled_code, namespace)
-        return namespace
-
-
 class ContainerEngine(StrEnum):
     """Enum for container engines."""
     PODMAN = "podman"
@@ -93,7 +25,7 @@ class ContainerEngine(StrEnum):
 
 DEFAULT_CONTAINER_ENGINE = ContainerEngine.DOCKER
 
-class ContainerSandbox(DummySandbox):
+class ContainerSandbox:
     """
     Basic sandbox that runs unsafe code in Podman or Docker container.
     - the sandbox should be safe against inadvertent bad code by LLM but not against malicious attacks.
