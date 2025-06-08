@@ -36,6 +36,10 @@ COPY ${SETUP_FILE} /setup.sh
 COPY ${WORKSPACE_ROOT} /workspace
 COPY ${EVAL_FILE} /eval.py
 
+COPY /Users/jameshou/Documents/Code/openevolve/ /openevolve
+RUN cd /openevolve && \
+    pip install -e .
+
 RUN mkdir /implementations
 RUN mkdir /inputs
 RUN mkdir /outputs

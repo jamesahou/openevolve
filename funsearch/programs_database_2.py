@@ -88,6 +88,12 @@ class ProgramsDatabase:
     self._config: config_lib.ProgramsDatabaseConfig = config
     self._template: code_manipulation_2.Program = template
     
+    self._last_reset_time: float = time.time()
+    self._program_counter = 0
+    self._backups_done = 0
+    self.identifier = identifier
+    self.workspace = worskpace
+    
     self._file_hierarchy = ProjectIndexer.get_tree_description(self._template)
 
     # Initialize empty islands.
@@ -104,11 +110,6 @@ class ProgramsDatabase:
     self._best_scores_per_test_per_island: list[ScoresPerTest | None] = (
         [None] * config.num_islands)
 
-    self._last_reset_time: float = time.time()
-    self._program_counter = 0
-    self._backups_done = 0
-    self.identifier = identifier
-    self.workspace = worskpace
 
   def get_best_programs_per_island(self) -> Iterable[Tuple[code_manipulation_2.Program | None]]:
     return sorted(zip(self._best_program_per_island, self._best_score_per_island), key=lambda t: t[1], reverse=True)

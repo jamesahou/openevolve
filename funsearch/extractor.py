@@ -10,8 +10,11 @@ import os
 from collections import deque
 import ast
 
+from typing import List
+
 from funsearch.structured_outputs import ProgramImplementation, FunctionImplementation
 from funsearch.custom_types import FullName, FuncMeta
+from funsearch.test_case import TestCase
 
 if sys.version_info >= (3, 12):
     from sys import monitoring
@@ -294,15 +297,16 @@ class Extractor:
 
 def extract_code(eval_file: Path, args: list, depth=-1):
     extractor = Extractor()
-    spec_structured, path, program_meta = extractor.run(eval_file, args, depth=depth)
+    spec_structured, path, program_meta = extractor.run(eval_file, args[0].args, depth=depth)
     return spec_structured, path, program_meta
 
-def add_decorators(program_meta, decorator="@funsearch.hotswap"):
+def add_decorators(program_meta: List[FuncMeta], decorator="@funsearch.hotswap"):
     """
     Edit the original file to add the specified decorator to the functions.
     Import funsearch at the top of the file.
     """
     for fullname, meta in program_meta.items():
+        meta: FuncMeta
         file_path = Path(meta.file_path)
         if not file_path.exists():
             continue
@@ -318,16 +322,22 @@ def add_decorators(program_meta, decorator="@funsearch.hotswap"):
             lines[line_no] = f"{decorator}\n" + lines[line_no]
         
         # import funsearch under __future__ imports, otherwise at the top of the file
-        future_import_index = -1
-        for i, line in enumerate(lines):
-            if line.startswith("from __future__ import") or line.startswith("import __future__"):
-                future_import_index = i
+        has_funsearch = False
+        for line in lines:
+            if "import funsearch" in line:
+                has_funsearch = True
                 break
+        if not has_funsearch:
+            future_import_index = -1
+            for i, line in enumerate(lines):
+                if line.startswith("from __future__ import") or line.startswith("import __future__"):
+                    future_import_index = i
+                    break
 
-        if future_import_index != -1:
-            lines.insert(future_import_index + 1, "import funsearch\n")
-        else:
-            lines.insert(0, "import funsearch\n\n")
+            if future_import_index != -1:
+                lines.insert(future_import_index + 1, "import funsearch\n")
+            else:
+                lines.insert(0, "import funsearch\n\n")
         
         with open(file_path, 'w') as f:
             f.writelines(lines)
@@ -364,9 +374,11 @@ if __name__ == "__main__":
     parser.add_argument("--args", nargs="*", help="arguments to pass to file")
     args = parser.parse_args()
 
+    args.args = [TestCase(args=args.args, kwargs=None)]
+
     spec_structured, path, program_meta = extract_code(Path(args.file), args.args)
 
     print(spec_structured)
 
     add_decorators(program_meta)
-    remove_decorators(program_meta)
+    # remove_decorators(program_meta)

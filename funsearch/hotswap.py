@@ -34,7 +34,7 @@ def get_implementation(func: FunctionType) -> Optional[str]:
         )
         return None
 
-def evolve(func: FunctionType):
+def hotswap(func: FunctionType):
     implementation = get_implementation(func)
 
     if implementation is None:

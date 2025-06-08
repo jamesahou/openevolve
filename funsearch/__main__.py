@@ -4,12 +4,15 @@ import os
 import pathlib
 import pickle
 import time
+import cloudpickle
 
 import click
 import llm
 from openai import OpenAI
 
 from dotenv import load_dotenv
+from typing import List
+from funsearch.test_case import TestCase
 
 
 # from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator, extractor
@@ -60,8 +63,9 @@ def main(ctx):
 
 @main.command()
 @click.argument("workspace", type=click.Path(file_okay=False))
+@click.argument("setup_file", type=click.Path(file_okay=True))
 @click.argument("eval_file", type=click.Path(file_okay=True))
-@click.argument('inputs')
+@click.argument("inputs", type=click.Path(file_okay=True))
 @click.option("--evolve_depth", default=-1, type=click.INT, help='How many levels to evolve the program')
 @click.option('--model_name', default="gpt-3.5-turbo-instruct", help='LLM model')
 @click.option('--output_path', default="./data/", type=click.Path(file_okay=False), help='path for logs and data')
@@ -69,54 +73,71 @@ def main(ctx):
 @click.option('--iterations', default=-1, type=click.INT, help='Max iterations per sampler')
 @click.option('--samplers', default=15, type=click.INT, help='Samplers')
 @click.option('--sandbox_type', default="ContainerSandbox", type=click.Choice(SANDBOX_NAMES), help='Sandbox type')
-def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
+def run(workspace, setup_file, eval_file, inputs, evolve_depth, model_name, output_path, load_backup, iterations, samplers, sandbox_type):
   timestamp = str(int(time.time()))
   log_path = pathlib.Path(output_path) / timestamp
   if not log_path.exists():
     log_path.mkdir(parents=True)
     logging.info(f"Writing logs to {log_path}")
-
-  lm = sampler.vLLM(2, "token-abc123", "http://0.0.0.0:11440/v1/", 
-                       "meta-llama/Llama-3.3-70B-Instruct", log_path)
+  
+  logging.info("Loading test cases from input file...")
+  inputs: List[TestCase] = cloudpickle.load(open(inputs, "rb"))
   workspace = pathlib.Path(workspace)
   imps_path = pathlib.Path(f"imps_{timestamp}")
   if not imps_path.exists():
     imps_path.mkdir(parents=True)
     logging.info(f"Writing implementations to {imps_path}")
-  
+  setup_file = pathlib.Path(setup_file) if setup_file else None
+
+  logging.info("Initializing language model and extractor...")
+  lm = sampler.vLLM(samples_per_prompt=2, url="https://generativelanguage.googleapis.com/v1beta/openai/", model="gemini-2.0-flash-lite", log_path=log_path)
+
   eval_file = pathlib.Path(eval_file)
+  logging.info(f"Extracting code from {eval_file} ...")
   initial_program, evolve_path, program_meta = extractor.extract_code(eval_file, inputs)
 
-  template = code_manipulation_2.str_to_program(initial_program)
+  logging.info("Converting structured output to program meta...")
+  template = code_manipulation_2.structured_output_to_prog_meta(initial_program, program_meta)
 
-  conf = config.Config(num_evaluators=1)
-  database = programs_database_2.ProgramsDatabase(
-    conf.programs_database, template, worskpace=workspace, identifier=timestamp)
-  if load_backup:
-    database.load(load_backup)
+  logging.info("Adding decorators to extracted functions...")
+  extractor.add_decorators(program_meta)
+  try:
+    logging.info("Creating config and initializing program database...")
+    conf = config.Config(num_evaluators=1)
+    database = programs_database_2.ProgramsDatabase(
+      conf.programs_database, template, worskpace=workspace, identifier=timestamp)
+    if load_backup:
+      logging.info("Loading backup database...")
+      database.load(load_backup)
 
-  inputs = parse_input(inputs)
+    # sandbox_class = next(c for c in SANDBOX_TYPES if c.__name__ == sandbox_type)
+    logging.info("Setting up sandbox and evaluators...")
+    sbox = sandbox.ContainerSandbox(workspace, eval_file, imps_path, setup_file=setup_file)
+    evaluators = [evaluator2.AsyncEvaluator(
+      database,
+      sbox,
+      template,
+      workspace,
+      eval_file,
+      imps_path,
+      program_meta,
+      inputs,
+    ) for _ in range(conf.num_evaluators)]
+    # We send the initial implementation to be analysed by one of the evaluators.
+    logging.info("Analyzing initial program implementation...")
+    evaluators[0].analyse(initial_program, island_id=None, implementation_id="-1")
+    assert len(database._islands[0]._clusters) > 0, ("Initial analysis failed. Make sure that Sandbox works! "
+                                                    "See e.g. the error files under sandbox data.")
 
-  sandbox_class = next(c for c in SANDBOX_TYPES if c.__name__ == sandbox_type)
-  evaluators = [evaluator2.Evaluator(
-    database,
-    sandbox_class(base_path=log_path),
-    template,
-    workspace,
-    eval_file,
-    imps_path,
-    program_meta,
-    inputs,
-  ) for _ in range(conf.num_evaluators)]
-  # We send the initial implementation to be analysed by one of the evaluators.
-  evaluators[0].analyse(initial_program, island_id=None, curr_id="-1")
-  assert len(database._islands[0]._clusters) > 0, ("Initial analysis failed. Make sure that Sandbox works! "
-                                                   "See e.g. the error files under sandbox data.")
+    logging.info(f"Starting {samplers} samplers and running core loop for {iterations if iterations > 0 else 'unlimited'} iterations...")
+    samplers = [sampler.Sampler(database, evaluators, lm, uid=i)
+                for i in range(samplers)]
 
-  samplers = [sampler.Sampler(database, evaluators, lm, uid=i)
-              for i in range(samplers)]
-
-  core.run(samplers, database, iterations)
+    core.run(samplers, database, iterations)
+    logging.info("Run completed successfully.")
+  finally:
+    logging.info("Removing decorators from extracted functions...")
+    extractor.remove_decorators(program_meta)
 
 
 @main.command()
