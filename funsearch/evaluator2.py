@@ -101,7 +101,7 @@ class AsyncEvaluator:
         for test_case in self._test_cases:
             test_output, runs_ok = self._sandbox.run(
                 # TODO: What do we want to pass here?
-                program, self._eval_file, test_case, self._timeout_seconds, curr_id
+                program, self._eval_file, test_case, self._timeout_seconds, implementation_id
             )
 
             if runs_ok and test_output is not None:
