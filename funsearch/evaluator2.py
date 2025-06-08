@@ -1,80 +1,79 @@
 """Class for evaluating programs proposed by the Sampler."""
-
-import re
-from collections.abc import Sequence
-import copy
-from typing import Any, Tuple, List, Dict
-
-from funsearch import code_manipulation
-from funsearch import programs_database_2
-from funsearch import sandbox
 from funsearch.code_manipulation_2 import (
+    Function,
     Program,
     header_from_str,
     structured_output_to_functions,
 )
 
+from funsearch import code_manipulation
+from funsearch import programs_database_2
+from funsearch import sandbox
+
+from funsearch.structured_outputs import ProgramImplementation
+from funsearch.test_case import TestCase
+
+from typing import Any, Tuple, List, Dict
+from collections.abc import Sequence
+
+import textwrap
 import pathlib
+import copy
 import ast
 import os
-import textwrap
+import re
 
+class ImplementationsManager:
+    """Class that manages implementations of programs."""
 
-def get_relative_path(absolute_path: pathlib.Path, project_root: str) -> pathlib.Path:
-    """Get the file path of the provided function relative to the project root."""
-    relative_path = absolute_path.relative_to(project_root)
-    return relative_path
+    implementations_root: pathlib.Path
+    workspace: pathlib.Path
+    program_meta: dict[str, Any]
+    
+    @classmethod
+    def _save_function(cls, function: Function, id: str):
+        """
+        Saves a single function to the implementation directory.
+        
+        Args:
+            function (Function): The function to save.
+            id (str): The unique identifier for the implementation.
+        """
+        func_file_path = cls.implementations_root / function.path
+        func_code_path = func_file_path / (function.qualname + ' ' + id)
 
-
-def _save_sample(
-    sample: Dict[str, str],
-    workspace: pathlib.Path,
-    imps_path: pathlib.Path,
-    program_meta: Dict[str, Any],
-    curr_id: str,
-) -> Program:
-    """Given sampler code in structured format, saves it in the implementation dir by current ID. Save in form accessible to decorator"""
-
-    # Check if the sample contains all the expected keys
-    expected_names = set(program_meta.keys())
-    if not set(sample.keys()) == expected_names:
-        raise ValueError(
-            f"Sample keys do not match expected function names. Expected: {expected_names}, got: {sample.keys()}"
-        )
-
-    functions = structured_output_to_functions(sample)
-    func_headers = [str(f.header) for f in functions.values()]
-    expected_headers = [
-        str(header_from_str(program_meta[name]["header"])) for name in expected_names
-    ]
-
-    # check if headers are same
-    if set(func_headers) != set(expected_headers):
-        raise ValueError(
-            f"Function headers do not match expected headers. Expected: {expected_headers}, got: {func_headers}"
-        )
-
-    for function_name, function in functions.items():
-        function_body = textwrap.dedent(function.body).strip() + "\n"
-
-        func_abs_path = pathlib.Path(program_meta[function_name]["file_path"])
-        func_rel_path = get_relative_path(func_abs_path, workspace)
-        func_file_path = imps_path / func_rel_path
         os.makedirs(func_file_path, exist_ok=True)
 
-        function.relative_path = str(func_rel_path)
-        function.class_name = program_meta[function_name]["class"]
-        function.line_no = program_meta[function_name]["line_no"]
-        function.qual_name = function_name
+        with open(func_code_path, "w") as file:
+            file.write(function.body)
 
-        func_file_path = func_file_path / f"{function_name} {curr_id}"
-        with open(func_file_path, "w") as f:
-            f.write(function_body)
+    @classmethod
+    def save_implementation(cls, implementation: ProgramImplementation, id: str) -> Program:
+        """Saves the implementation in the specified directory."""
+        """Given sampler code in structured format, saves it in the implementation dir by current ID. Save in form accessible to decorator"""
 
-    return Program(functions=functions.values())
+        # Ensure that the implementation has all the expected functions, and nothing extra
+        implemented_function_qualnames = {function.qualname for function in implementation.functions}
+        expected_function_qualnames = set(cls.program_meta.keys())
+
+        missing_qualnames = expected_function_qualnames - implemented_function_qualnames
+        extra_qualnames = implemented_function_qualnames - expected_function_qualnames
+        
+        if missing_qualnames or extra_qualnames:
+            raise ValueError(
+                f"Implemented functions do not match expected function names. "
+                f"Missing: {missing_qualnames}, Extra: {extra_qualnames}"
+            )
+
+        functions = structured_output_to_functions(implementation)
+
+        for function in functions.values():
+            cls._save_function(function, id)
+        
+        return Program(functions=list(functions.values()))
 
 
-class Evaluator:
+class AsyncEvaluator:
     """Class that analyses functions generated by LLMs."""
 
     def __init__(
@@ -86,12 +85,12 @@ class Evaluator:
         eval_file: pathlib.Path,
         imps_path: pathlib.Path,
         program_meta: Dict[str, Any],
-        inputs: Sequence[Any],
+        test_cases: Sequence[TestCase],
         timeout_seconds: int = 30,
     ):
         self._database = database
         self._template = template
-        self._inputs = inputs
+        self._test_cases = test_cases
         self._timeout_seconds = timeout_seconds
         self._sandbox = sbox
         self._eval_file = eval_file
@@ -99,23 +98,30 @@ class Evaluator:
         self._program_meta = program_meta
         self._workspace = workspace
 
-    def analyse(
-        self, sample: Dict[str, str], island_id: int | None, curr_id: str
-    ) -> None:
+    async def analyse(
+        self,
+        implementation: ProgramImplementation,
+        island_id: int | None,
+        implementation_id: str
+    ):
         """Compiles the sample into a program and executes it on test inputs."""
 
         program = _save_sample(
-            sample, self._workspace, self._imps_path, self._program_meta, curr_id
+            implementation, self._workspace, self._imps_path, self._program_meta, implementation_id
         )
 
         scores_per_test = {}
-        for current_input in self._inputs:
+
+        for test_case in self._test_cases:
             test_output, runs_ok = self._sandbox.run(
-                program, self._eval_file, current_input, self._timeout_seconds, curr_id
+                program, self._eval_file, test_case, self._timeout_seconds, curr_id
             )
+
             if runs_ok and test_output is not None:
                 if not isinstance(test_output, (int, float)):
-                    raise ValueError("@function.run did not return an int/float score.")
-                scores_per_test[current_input] = test_output
+                    raise ValueError("@run did not return an int/float score.")
+                    
+                scores_per_test[test_case] = test_output
+
         if scores_per_test:
             self._database.register_program(program, island_id, scores_per_test)
