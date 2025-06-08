@@ -53,7 +53,8 @@ class Function:
         body = self.body.strip()
         if not body.endswith("\n"):
             body += "\n"
-        return f"{header_str}\n{body}"
+        indented_body = textwrap.indent(body, "    ")
+        return f"{header_str}\n{indented_body}"
 
     def to_str(self, version: int | None = None) -> str:
         """Return the function as a string.
@@ -69,7 +70,8 @@ class Function:
             return_type=self.header.return_type,
         )
         body = self.body.strip()
-        return f"{header_copy}\n{body}"
+        indented_body = textwrap.indent(body, "    ")
+        return f"{header_copy}\n{indented_body}"
 
     def __setattr__(self, name: str, value: str) -> None:
         # Ensure there aren't leading & trailing new lines in `body`.
