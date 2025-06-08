@@ -5,6 +5,12 @@ from pathlib import Path
 # An annotation for full names (abspath + space + qualname)
 FullName: TypeAlias = str
 
+# Path types
+HostAbsPath: TypeAlias = str      # This is an absolute path on the host (e.g. "/home/user/project/.flake8")
+HostRelPath: TypeAlias = str      # This is a relative path inside the project on the host, excluding the workspace root (e.g. "./.flake8")
+ContainerAbsPath: TypeAlias = str # This is an absolute path in the container, starting with "/", e.g. "/workspace/.flake8"
+ContainerRelPath: TypeAlias = str # This is a relative path inside the project in the container, excluding the workspace root (e.g. "./.flake8")
+
 @dataclasses.dataclass
 class FuncMeta:
     """
