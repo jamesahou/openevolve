@@ -9,16 +9,12 @@ import os
 from collections import deque
 import ast
 
-from typing import List
+from typing import List, Any
 
 from funsearch.structured_outputs import ProgramImplementation, FunctionImplementation
-from funsearch.custom_types import FullName, FuncMeta
+from funsearch.custom_types import FullName, FuncMeta, HostAbsPath, HostRelPath
 from funsearch.test_case import TestCase
 
-if sys.version_info >= (3, 12):
-    from sys import monitoring
-
-# --- Builtins storage ---
 builtins._dbg_storage = dict(
     fns_to_evolve=[],
     fns_to_run=[],
@@ -202,16 +198,18 @@ class Extractor:
 
         return self.trace
 
-    def run(self, file: Path, script_args: list, depth: int=-1):
+    def run(self, project_root: HostAbsPath, eval_file: HostAbsPath, script_args: List[Any], depth: int=-1):
         assert(depth >= -1 and isinstance(depth, int))
-        self.script_path = file.resolve()
-        self.base_dir = self.script_path.parent
-        print("base_dir", self.base_dir)
-        sys.argv.pop(0)
-        sys.argv.extend(script_args)
-        original_argv = sys.argv.copy()
+        
+        self.script_path = project_root / eval_file
+        self.base_dir = project_root
+        print("Extracting trace from", self.base_dir)
 
+        # Save the original sys.argv to restore later
+        original_argv = sys.argv.copy()
         try:
+            # Set sys.argv for the script
+            sys.argv = [str(self.script_path)] + list(map(str, script_args))
             # Clear builtins data
             builtins._dbg_storage['fns_to_evolve'].clear()
             builtins._dbg_storage['fns_to_run'].clear()
@@ -220,8 +218,8 @@ class Extractor:
             builtins._dbg_storage['call_graph'].clear()
 
             # Compile user script
-            code_text = file.read_text()
-            compiled = compile(code_text, filename=file.name, mode="exec")
+            code_text = self.script_path.read_text()
+            compiled = compile(code_text, filename=str(eval_file), mode="exec")
             
             sys.settrace(self.trace)
             module_globals = {"__name__": "__main__"}
@@ -229,7 +227,7 @@ class Extractor:
 
         finally:
             sys.settrace(None)
-            sys.argv = original_argv
+            sys.argv = original_argv  # Restore original argv
 
         # Use fullname as the identifier
         opt_fullnames = {f"{getattr(fn.__code__, 'co_filename', file)} {getattr(fn.__code__, 'co_qualname', fn.__name__)}" for fn in builtins._dbg_storage['fns_to_evolve']}
@@ -294,9 +292,10 @@ class Extractor:
 
         return spec_structured, path[-depth:], program_meta
 
-def extract_code(eval_file: Path, args: list, depth=-1):
+def extract_code(project_root: HostAbsPath, eval_file: HostRelPath, tests: List[TestCase], depth: int=-1):
     extractor = Extractor()
-    spec_structured, path, program_meta = extractor.run(eval_file, args[0].args, depth=depth)
+    spec_structured, path, program_meta = extractor.run(project_root, eval_file, tests[0].args, depth=depth)
+    print(spec_structured, path, program_meta)
     return spec_structured, path, program_meta
 
 def add_decorators(program_meta: dict[FullName, FuncMeta], decorator="@funsearch.hotswap"):
@@ -380,4 +379,4 @@ if __name__ == "__main__":
     print(spec_structured)
 
     add_decorators(program_meta)
-    # remove_decorators(program_meta)
+    remove_decorators(program_meta)
