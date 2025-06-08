@@ -310,7 +310,7 @@ class ContainerSandbox(DummySandbox):
         implementation_id: str,
         test_id: int,
         timeout: float = 30.0,
-    ):
+    ) -> Any:
         """
         Runs the container sandbox with the specified entry point and implementation ID.
 
@@ -318,6 +318,9 @@ class ContainerSandbox(DummySandbox):
             implementation_id (str): The ID of the implementation to run.
             test_id (int): The ID of the test case to execute.
             timeout (float): The maximum time in seconds to allow for the function execution.
+
+        Returns:
+            Any: The returned output from the evaluator function, run on the test case.
         """
         self.execute(implementation_id, test_id, timeout)
 
