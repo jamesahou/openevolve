@@ -110,7 +110,7 @@ class Sampler:
     def __init__(
         self,
         database: programs_database.ProgramsDatabase,
-        evaluators: Sequence[evaluator2.Evaluator],
+        evaluators: Sequence[evaluator2.AsyncEvaluator],
         model: LLM | vLLM,
         uid: int = 0,
     ) -> None:
@@ -160,7 +160,6 @@ if __name__ == "__main__":
 
     model = vLLM(
         samples_per_prompt=2,
-        key="",
         url="https://generativelanguage.googleapis.com/v1beta/openai/",
         model="gemini-2.0-flash-lite",
         log_path=Path("logs") 
