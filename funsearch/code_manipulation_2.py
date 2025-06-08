@@ -7,7 +7,7 @@ import textwrap
 from typing import List, Tuple, Sequence, Any, Dict, Iterable
 import re
 from enum import Enum
-from types import FullName, FuncMeta
+from funsearch.custom_types import FullName, FuncMeta
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -194,6 +194,7 @@ def structured_output_to_functions(
     functions: Dict[FullName, Function] = {}
     for structured_function in structured_output.functions:
         function = str_to_function(structured_function.code)
+        function.qualname = structured_function.qualname
         function.path = structured_function.filepath
         functions[structured_function.filepath + ' ' + structured_function.qualname] = function
     return functions
@@ -201,6 +202,8 @@ def structured_output_to_functions(
 
 def header_from_str(header_str: str) -> FuncHeader:
     """Parse a function header from a string."""
+    if header_str.strip().endswith(":"):
+        header_str = f"{header_str}\n    pass"
     func = str_to_function(header_str)
     return func.header
 

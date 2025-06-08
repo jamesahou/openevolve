@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import TypeAlias, Any
 import dataclasses
 from pathlib import Path
 

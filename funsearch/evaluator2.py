@@ -7,7 +7,7 @@ from funsearch.code_manipulation_2 import (
     structured_output_to_prog_meta
 )
 
-from funsearch.types import FullName, FuncMeta
+from funsearch.custom_types import FullName, FuncMeta
 
 from funsearch import code_manipulation
 from funsearch import programs_database_2

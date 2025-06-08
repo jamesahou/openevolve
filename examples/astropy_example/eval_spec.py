@@ -1,6 +1,6 @@
 # Minimal code path from {'eval.py evaluate_concatenate'} to {'/Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py Angle._wrap_at'}
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/funcs.py:372
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/funcs.py:354
 def concatenate(coords):
     """
     Combine multiple coordinate objects into a single
@@ -40,7 +40,7 @@ def concatenate(coords):
         concatenate_representations([c.data for c in coords]), frame=scs[0].frame
     )
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate.py:319 | Class: SkyCoord
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate.py:305 | Class: SkyCoord
 def __init__(self, *args, copy=True, **kwargs):
     # these are frame attributes set on this SkyCoord but *not* a part of
     # the frame object this SkyCoord contains
@@ -111,7 +111,7 @@ def __init__(self, *args, copy=True, **kwargs):
         if not self._sky_coord_frame.has_data:
             raise ValueError("Cannot create a SkyCoord without data")
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate_parsers.py:239
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate_parsers.py:207
 def _parse_coordinate_data(frame, args, kwargs):
     """
     Extract coordinate data from the args and kwargs passed to SkyCoord.
@@ -236,7 +236,7 @@ def _parse_coordinate_data(frame, args, kwargs):
 
     return valid_skycoord_kwargs, valid_components, info
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate_parsers.py:405
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/sky_coordinate_parsers.py:366
 def _parse_coordinate_arg(coords, frame, units, init_kwargs):
     """
     Single unnamed arg supplied.  This must be:
@@ -444,7 +444,7 @@ def _parse_coordinate_arg(coords, frame, units, init_kwargs):
         ) from err
     return skycoord_kwargs, components
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:752 | Class: Longitude
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:714 | Class: Longitude
 def __new__(cls, angle, unit=None, wrap_angle=None, **kwargs):
     # Forbid creating a Long from a Lat.
     if isinstance(angle, Latitude):
@@ -457,11 +457,12 @@ def __new__(cls, angle, unit=None, wrap_angle=None, **kwargs):
     self.wrap_angle = wrap_angle  # angle-like b/c property setter
     return self
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:784 | Class: Longitude
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:738 | Class: Longitude
 def wrap_angle(self):
+
     return self._wrap_angle
 
-# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:433 | Class: Angle
+# Location: /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py:402 | Class: Angle
 def _wrap_at(self, wrap_angle):
     """
     Implementation that assumes ``angle`` is already validated
