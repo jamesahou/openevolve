@@ -27,6 +27,9 @@ from funsearch import evaluator2
 from funsearch import programs_database
 from funsearch.structured_outputs import ProgramImplementation
 
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 class LLM:
     """Language model that predicts continuation of provided source code."""
@@ -60,9 +63,16 @@ class LLM:
 
 class vLLM:
     def __init__(
-        self, samples_per_prompt: int, key: str, url: str, model: str, log_path=None
+        self, samples_per_prompt: int, url: str, model: str, log_path=None
     ):
-        self.client = OpenAI(api_key=key, base_url=url)
+        current_dir = Path(__file__).parent
+        dotenv_path = current_dir / '.env'
+        if dotenv_path.exists():
+            load_dotenv(dotenv_path)
+        self.key = os.getenv('API_KEY', '') 
+        if not self.key:
+            raise ValueError("API key not found. Please set the OPENAI_API_KEY environment variable.")
+        self.client = OpenAI(api_key=self.key, base_url=url)
         self.samples_per_prompt = samples_per_prompt
         self.log_path = log_path
         self.model = model
