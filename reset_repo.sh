@@ -7,6 +7,8 @@ cd /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astro
 git clean -fd
 git reset --hard 96cc7fbe
 
+cp /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/eval.py /Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/eval.py
+
 COORDS_CORE="/Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy/astropy/coordinates/angles/core.py"
 
 # Insert 'import funsearch' at the top if not present
