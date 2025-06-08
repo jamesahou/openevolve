@@ -10,26 +10,29 @@ from funsearch.constants import HOTSWAP_ENVVAR
 IMPLEMENTATIONS_ROOT = "implementations/"
 PROJECT_ROOT = "workspace/"
 
-
 def get_relative_path(func: FunctionType, root: str) -> str:
     """Get the file path of the provided function relative to the project root."""
     absolute_path = inspect.getfile(func)
     relative_path = absolute_path.split(root, 1)[-1].lstrip('/')
     return relative_path
 
-
-def get_implementation(
-    func: FunctionType
-) -> Optional[str]:
+def get_implementation(func: FunctionType) -> Optional[str]:
     """Get the implementation of the function as a string."""
     filepath = get_relative_path(func, PROJECT_ROOT)
     qualname = func.__qualname__
-    procname = os.environ.get(HOTSWAP_ENVVAR, "")
-    imp_name = f"{qualname} {procname}"
+    procname = os.environ.get(HOTSWAP_ENVVAR)
+    if procname == "-1":
+        return None
+    imp_name = qualname + " " + procname
     imp_path = os.path.join(IMPLEMENTATIONS_ROOT, PROJECT_ROOT, filepath, imp_name)
-
-    return open(imp_path, 'r').read() if os.path.exists(imp_path) else None
-
+    try:
+        return open(imp_path, 'r').read() 
+    except FileNotFoundError:
+        warnings.warn(
+            f"No implementation found for function '{func.__name__}'. "
+            "Using the original definition."
+        )
+        return None
 
 def evolve(func: FunctionType):
     implementation = get_implementation(func)
@@ -50,4 +53,3 @@ def evolve(func: FunctionType):
     wrapper.__doc__ = func.__doc__
 
     return wrapper
-
