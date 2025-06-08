@@ -6,6 +6,8 @@ from funsearch.code_manipulation_2 import (
     structured_output_to_functions,
 )
 
+from funsearch.types import FullName
+
 from funsearch import code_manipulation
 from funsearch import programs_database_2
 from funsearch import sandbox
@@ -26,9 +28,11 @@ import re
 class ImplementationsManager:
     """Class that manages implementations of programs."""
 
+    # Directory where implementations are saved
     implementations_root: pathlib.Path
-    workspace: pathlib.Path
-    program_meta: dict[str, Any]
+
+    # This is a mapping from function full names to their metadata
+    program_meta: dict[FullName, FunctionMetadata]
     
     @classmethod
     def _save_function(cls, function: Function, id: str):
@@ -64,6 +68,17 @@ class ImplementationsManager:
                 f"Implemented functions do not match expected function names. "
                 f"Missing: {missing_qualnames}, Extra: {extra_qualnames}"
             )
+
+        # Ensure that the function headers match the expected headers
+        for function in implementation.functions:
+            # TODO: Fix this after FunctionMetadata is implemented
+            expected_header = cls.program_meta[function.qualname]
+            
+            if function.code != expected_header:
+                raise ValueError(
+                    f"Function header mismatch for {function.qualname}. "
+                    f"Expected: {expected_header}, Found: {function.header}"
+                )
 
         functions = structured_output_to_functions(implementation)
 
@@ -105,15 +120,14 @@ class AsyncEvaluator:
         implementation_id: str
     ):
         """Compiles the sample into a program and executes it on test inputs."""
+        program = ImplementationsManager.save_implementation(implementation, implementation_id)
 
-        program = _save_sample(
-            implementation, self._workspace, self._imps_path, self._program_meta, implementation_id
-        )
-
-        scores_per_test = {}
+        # Evaluate on the test cases and get the test scores
+        test_scores = {}
 
         for test_case in self._test_cases:
             test_output, runs_ok = self._sandbox.run(
+                # TODO: What do we want to pass here?
                 program, self._eval_file, test_case, self._timeout_seconds, curr_id
             )
 
@@ -121,7 +135,7 @@ class AsyncEvaluator:
                 if not isinstance(test_output, (int, float)):
                     raise ValueError("@run did not return an int/float score.")
                     
-                scores_per_test[test_case] = test_output
+                test_scores[test_case] = test_output
 
-        if scores_per_test:
-            self._database.register_program(program, island_id, scores_per_test)
+        if test_scores:
+            self._database.register_program(program, island_id, test_scores)
