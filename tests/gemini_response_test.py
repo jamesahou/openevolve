@@ -1,9 +1,9 @@
 from openai import OpenAI
 import pathlib
 
-from funsearch import extractor, project_indexer, evaluator2, code_manipulation_2
-from funsearch.code_manipulation_2 import Function
-from funsearch.structured_outputs import ProgramImplementation
+from openevolve import extractor, project_indexer, evaluator2, code_manipulation_2
+from openevolve.code_manipulation_2 import Function
+from openevolve.structured_outputs import ProgramImplementation
 import textwrap
 from IPython import embed
 

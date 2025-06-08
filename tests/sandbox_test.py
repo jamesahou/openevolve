@@ -1,6 +1,6 @@
 import pathlib
 import tempfile
-from funsearch.sandbox import ExternalProcessSandbox, ContainerSandbox
+from openevolve.sandbox import ExternalProcessSandbox, ContainerSandbox
 
 test_prog = """
 print("running!")

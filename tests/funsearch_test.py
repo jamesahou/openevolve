@@ -16,7 +16,7 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 
-from funsearch import core
+from openevolve import core
 
 _PY_PROMPT = '''\
 import itertools

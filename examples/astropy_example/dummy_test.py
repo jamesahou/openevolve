@@ -1,4 +1,4 @@
-from funsearch.test_case import TestCase
+from openevolve.test_case import TestCase
 import cloudpickle
 
 cases = []

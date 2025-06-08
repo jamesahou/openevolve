@@ -8,10 +8,10 @@ import itertools
 
 import numpy as np
 
-import funsearch
+import openevolve
 
 
-@funsearch.run
+@openevolve.run
 def evaluate(n: int) -> int:
   """Returns the size of an `n`-dimensional cap set."""
   capset = solve(n)
@@ -44,7 +44,7 @@ def solve(n: int) -> np.ndarray:
   return capset
 
 
-@funsearch.evolve
+@openevolve.evolve
 def priority(el: tuple[int, ...], n: int) -> float:
   """Returns the priority with which we want to add `element` to the cap set.
   el is a tuple of length n with values 0-2.

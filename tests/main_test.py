@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from funsearch.__main__ import main, parse_input
+from openevolve.__main__ import main, parse_input
 
 ROOT_DIR = Path(__file__).parent.parent
 

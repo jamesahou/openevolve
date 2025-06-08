@@ -13,9 +13,9 @@ from astropy.coordinates import (
 from astropy import units as u
 from astropy.time import Time
 import time
-import funsearch
+import openevolve
 
-@funsearch.run
+@openevolve.run
 def evaluate_concatenate():
     start_time = time.time()
     icrs_array = ICRS(

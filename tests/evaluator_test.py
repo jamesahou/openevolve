@@ -18,7 +18,7 @@ import textwrap
 from absl.testing import absltest
 from absl.testing import parameterized
 
-from funsearch import evaluator
+from openevolve import evaluator
 
 TESTS_FOLDER = pathlib.Path(__file__).parent
 
