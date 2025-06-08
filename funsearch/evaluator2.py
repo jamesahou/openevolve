@@ -4,9 +4,10 @@ from funsearch.code_manipulation_2 import (
     Program,
     header_from_str,
     structured_output_to_functions,
+    structured_output_to_prog_meta
 )
 
-from funsearch.types import FullName
+from funsearch.types import FullName, FuncMeta
 
 from funsearch import code_manipulation
 from funsearch import programs_database_2
@@ -28,7 +29,7 @@ class ImplementationsManager:
     implementations_root: pathlib.Path
 
     # This is a mapping from function full names to their metadata
-    program_meta: dict[FullName, FunctionMetadata]
+    program_meta: dict[FullName, FuncMeta]
     
     @classmethod
     def _save_function(cls, function: Function, id: str):
@@ -52,36 +53,12 @@ class ImplementationsManager:
         """Saves the implementation in the specified directory."""
         """Given sampler code in structured format, saves it in the implementation dir by current ID. Save in form accessible to decorator"""
 
-        # Ensure that the implementation has all the expected functions, and nothing extra
-        implemented_function_qualnames = {function.qualname for function in implementation.functions}
-        expected_function_qualnames = set(cls.program_meta.keys())
+        parsed_prog = structured_output_to_prog_meta(implementation, cls.program_meta)
 
-        missing_qualnames = expected_function_qualnames - implemented_function_qualnames
-        extra_qualnames = implemented_function_qualnames - expected_function_qualnames
-        
-        if missing_qualnames or extra_qualnames:
-            raise ValueError(
-                f"Implemented functions do not match expected function names. "
-                f"Missing: {missing_qualnames}, Extra: {extra_qualnames}"
-            )
-
-        # Ensure that the function headers match the expected headers
-        for function in implementation.functions:
-            # TODO: Fix this after FunctionMetadata is implemented
-            expected_header = cls.program_meta[function.qualname]
-            
-            if function.code != expected_header:
-                raise ValueError(
-                    f"Function header mismatch for {function.qualname}. "
-                    f"Expected: {expected_header}, Found: {function.header}"
-                )
-
-        functions = structured_output_to_functions(implementation)
-
-        for function in functions.values():
+        for function in parsed_prog.functions:
             cls._save_function(function, id)
         
-        return Program(functions=list(functions.values()))
+        return parsed_prog
 
 
 class AsyncEvaluator:
@@ -95,7 +72,7 @@ class AsyncEvaluator:
         workspace: pathlib.Path,
         eval_file: pathlib.Path,
         imps_path: pathlib.Path,
-        program_meta: Dict[str, Any],
+        program_meta: dict[FullName, FuncMeta],
         test_cases: Sequence[TestCase],
         timeout_seconds: int = 30,
     ):
