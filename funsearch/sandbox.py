@@ -28,7 +28,6 @@ class DummySandbox:
     unless the host environment is in some kind of sandbox itself.
     Even in sandboxed host, the executed code could theoretically affect later executions.
     """
-
     sandboxes = 0
 
     def __init__(self, **kwargs):
@@ -122,10 +121,11 @@ class ExternalProcessSandbox(DummySandbox):
     def _exec(
         self,
         call_data_path: pathlib.Path,
-        input_path: pathlib.Path,
-        error_file_path: pathlib.Path,
+        stdin: pathlib.Path,
+        stderr: pathlib.Path,
     ):
-        """Use podman/docker to execute python in a container.
+        """
+        Use podman/docker to execute python in a container.
         - The main.py shall execute the LLM generated method from prog.pickle file providing
           input.pickle as the input for the method.
         - main.py writes the output of the method into output.pickle.
@@ -135,18 +135,18 @@ class ExternalProcessSandbox(DummySandbox):
         prog_path = call_data_path / "prog.pickle"
         output_file = call_data_path / "output.pickle"
         cmd = (
-            f"{self.python_path} {CONTAINER_MAIN} {prog_path} {input_path} {output_file}"
-            f"  2> {error_file_path}"
+            f"{self.python_path} {CONTAINER_MAIN} {prog_path} {stdin} {output_file}"
+            f"  2> {stderr}"
         )
         logging.debug(f"Executing: {cmd}")
         return os.system(cmd)
 
     def run(
         self,
-        program: str,
-        function_to_run: str,
-        test_input,
-        timeout_seconds: int,
+        entry_point: pathlib.Path,
+        implementation_id: str,
+        test_case: TestCase,
+        timeout: float = 30.0,
     ) -> tuple[Any, bool]:
         call_data_folder = (self.output_path / f"call{self.call_count}").absolute()
         if not call_data_folder.exists():
@@ -159,7 +159,7 @@ class ExternalProcessSandbox(DummySandbox):
             with open(input_path, "wb") as f:
                 cloudpickle.dump(test_input, f)
         try:
-            namespace = DummySandbox.compile_code(program)
+            namespace = DummySandbox.compile(program)
 
             prog_file = (call_data_folder / f"prog.pickle").absolute()
             with open(prog_file, "wb+") as f:
@@ -209,8 +209,8 @@ class ContainerSandbox(ExternalProcessSandbox):
     engine: ContainerEngine = DEFAULT_CONTAINER_ENGINE
     image_built = False
 
-    @classmethod
-    def has_engine(cls, engine: ContainerEngine) -> bool:
+    @staticmethod
+    def has_engine(engine: ContainerEngine) -> bool:
         """Checks if the specified container engine is available."""
         ret = os.system(f"{engine.value} --version")
         return ret == 0
@@ -220,13 +220,14 @@ class ContainerSandbox(ExternalProcessSandbox):
         """Sets the container engine to the specified one."""
         cls.engine = engine
 
-    @classmethod
-    def build_image(cls, extra_pip_packages):
-        """Builds the container image."""
-        version = sys.version.split(" ")[0]
-        logging.debug(f"Using Python version: {version}")
+    @property
+    def executable(self) -> str:
+        """Returns the executable command for the container engine."""
+        return self.engine.value
 
-        # Select which container engine to use
+    @classmethod
+    def select_engine(cls):
+        """Selects the container engine to use."""
         logging.debug("Checking for Podman...")
 
         if not cls.has_engine(ContainerEngine.PODMAN):
@@ -240,22 +241,44 @@ class ContainerSandbox(ExternalProcessSandbox):
                     "Could not find Podman or Docker. Can not use ContainerSandbox."
                 )
 
-        # Build the container image
+    @classmethod
+    def build_image(cls, workspace_path: pathlib.Path, setup_file: pathlib.Path | None = None):
+        """Builds the container image."""
+        version = sys.version.split(" ")[0]
+        logging.debug(f"Using Python version: {version}")
+
+        # Select which container engine to use
+        cls.select_engine()
+
+        # Define the path to the Dockerfile
         dockerfile = pathlib.Path(__file__).parent / "container" / "Dockerfile"
         logging.debug("Building container image")
-        extra = ""
-        if extra_pip_packages:
-            extra = f'--build-arg INSTALL_PACKAGES="{extra_pip_packages}"'
 
+        # Add the setup file as a build argument if provided
+        extra = ""
+
+        if setup_file is not None:
+            extra = f'--build-arg SETUP_FILE="{setup_file}"'
+
+        # Prepare the command to build the container image
         cmd = (
-            f"{cls.engine} build --build-arg PYTHON_VERSION={version} {extra} "
-            f"-t {IMAGE_NAME} -f {dockerfile} {CONTAINER_MAIN.parent}"
+            # Use the container engine to build the image
+            f"{cls.executable} build "
+            # Set the build argument for the workspace root
+            f"--build-arg WORKSPACE_ROOT={workspace_path} "
+            # Set the build argument for the Python version
+            f"--build-arg PYTHON_VERSION={version} "
+            # Tag the image with the name
+            f"-t {IMAGE_NAME} "
+            # Use the Dockerfile from the container directory
+            f"-f {dockerfile} {CONTAINER_MAIN.parent} "
+            # Add any extra build arguments, such as the setup file
+            f"{extra}"
         )
+
+        # Execute the command to build the image
         logging.debug(f"Executing: {cmd}")
         os.system(cmd)
-
-        # TODO: Add the decorators to the relevant functions in the project directory
-        logging.debug("Adding decorators to the project directory.")
 
         # Complete the image build process
         logging.debug("Container image built successfully.")
@@ -263,21 +286,34 @@ class ContainerSandbox(ExternalProcessSandbox):
 
     def __init__(
         self,
-        base_path: pathlib.Path,
+        workspace_path: pathlib.Path,
         python_path: str = "python",
-        extra_pip_packages: str = "numpy",
+        setup_file: pathlib.Path | None = None,
         timeout: float = 30.0,
     ):
-        super().__init__(base_path, python_path, timeout)
+        """Initializes the container sandbox.
+
+        Args:
+            workspace_path (pathlib.Path): The absolute path to the modified workspace root on the host.
+            python_path (str): The path to the Python interpreter to use. Defaults to "python".
+            setup_file (pathlib.Path | None): The path to the setup file for installation, located on the host. This will be copied to the container.
+            timeout (float): The timeout for the container execution in seconds.
+        """
+        super().__init__(workspace_path, python_path, timeout)
+
+        # Check if setup_file is a shell script
+        if setup_file is not None and setup_file.suffix != ".sh":
+            raise ValueError(
+                f"setup_file must be a shell script, got {setup_file.suffix}"
+            )
 
         if not ContainerSandbox.image_built:
-            ContainerSandbox.build_image(extra_pip_packages)
+            ContainerSandbox.build_image(setup_file)
 
     def _exec(
         self,
-        call_data_path: pathlib.Path,
-        input_path: pathlib.Path,
-        error_file_path: pathlib.Path,
+        stdin: pathlib.Path,
+        stderr: pathlib.Path,
     ):
         """
         Use podman/docker to execute python in a container.
@@ -289,13 +325,13 @@ class ContainerSandbox(ExternalProcessSandbox):
         """
         cmd = (
             f"{self.executable} run "
-            f"--stop-timeout={self.timeout_secs} "
+            f"--stop-timeout={self.timeout} "
             f"-v {CONTAINER_MAIN}:/main.py:ro "
             f"-v {call_data_path}:/workspace "
-            f"-v {input_path}:/input.pickle:ro "
+            f"-v {stdin}:/input.pickle:ro "
             f"{IMAGE_NAME}:latest /usr/local/bin/python3 "
             f"/main.py /workspace/prog.pickle /input.pickle /workspace/output.pickle"
-            f"  2> {error_file_path}"
+            f"  2> {stderr}"
         )
         logging.debug(f"Executing: {cmd}")
         return os.system(cmd)
