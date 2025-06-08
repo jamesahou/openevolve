@@ -11,6 +11,7 @@ from collections import deque
 import ast
 
 from funsearch.structured_outputs import ProgramImplementation, FunctionImplementation
+from funsearch.custom_types import FullName, FuncMeta
 
 if sys.version_info >= (3, 12):
     from sys import monitoring
@@ -262,14 +263,12 @@ class Extractor:
             if class_name:
                 location_comment += f" | Class: {class_name}"
             spec_code.append(f"{location_comment}\n{code}")
-            
             spec_structured.append(FunctionImplementation(filepath=file_path, qualname=qualname, code=code))
 
             func_class[fullname] = class_name
             func_header[fullname] = header
         
-        spec_structured = ProgramImplementation(
-            functions=spec_structured)
+        spec_structured = ProgramImplementation(functions=spec_structured)
 
         # Write the code to a file
         spec_code_str = "\n\n".join(spec_code)
@@ -279,48 +278,45 @@ class Extractor:
         with open(spec_code_path, 'w') as f:
             f.write(spec_code_str)
 
-        # Get location of functions on path, now also include header
-        loc_dict = {
-            fullname: {
-                "file_path": file_path,
-                "line_no": line_no,
-                "class": func_class.get(fullname, None),
-                "header": func_header.get(fullname, None),
-                "qualname": qualname,
-            }
-            for fullname in path[-depth:]
-            for (file_path, line_no, qualname) in [builtins._dbg_storage["fn_locs"][fullname]]
-        }
-        
-        return spec_structured, path[-depth:], loc_dict
+        program_meta = {}
+        for fullname in path[-depth:]:
+            for (file_path, line_no, qualname) in [builtins._dbg_storage["fn_locs"][fullname]]:
+                func_meta = FuncMeta(
+                    file_path=file_path,
+                    line_no=line_no,
+                    qualname=qualname,
+                    class_name=func_class.get(fullname, None),
+                    header=func_header.get(fullname, None)
+                )
+                program_meta[fullname] = func_meta
+
+        return spec_structured, path[-depth:], program_meta
 
 def extract_code(eval_file: Path, args: list, depth=-1):
     extractor = Extractor()
-    spec_structured, path, loc_dict = extractor.run(eval_file, args, depth=depth)
-    return spec_structured, path, loc_dict
+    spec_structured, path, program_meta = extractor.run(eval_file, args, depth=depth)
+    return spec_structured, path, program_meta
 
-def add_decorators(loc_dict, decorator="@funsearch.hotswap"):
+def add_decorators(program_meta, decorator="@funsearch.hotswap"):
     """
     Edit the original file to add the specified decorator to the functions.
     Import funsearch at the top of the file.
     """
-    
-    for fullname, loc in loc_dict.items():
-        file_path = Path(loc["file_path"])
+    for fullname, meta in program_meta.items():
+        file_path = Path(meta.file_path)
         if not file_path.exists():
             continue
         with open(file_path, 'r') as f:
             lines = f.readlines()
         
         # Add the decorator above the function definition
-        line_no = loc["line_no"] - 1  # Convert to 0-based index
+        line_no = meta.line_no - 1  # Convert to 0-based index
         
-        if loc["class"]:
+        if meta.class_name:
             lines[line_no] = f"    {decorator}\n" + lines[line_no]
         else:
             lines[line_no] = f"{decorator}\n" + lines[line_no]
         
-        # lines.insert(0, "import funsearch\n\n") 
         # import funsearch under __future__ imports, otherwise at the top of the file
         future_import_index = -1
         for i, line in enumerate(lines):
@@ -333,19 +329,17 @@ def add_decorators(loc_dict, decorator="@funsearch.hotswap"):
         else:
             lines.insert(0, "import funsearch\n\n")
         
-
         with open(file_path, 'w') as f:
             f.writelines(lines)
         
         print(f"Added decorator to {file_path} at line {line_no + 1}")
 
-def remove_decorators(loc_dict, decorator="@funsearch.hotswap"):
+def remove_decorators(program_meta, decorator="@funsearch.hotswap"):
     """
     Edit the original file to remove the specified decorator from the functions.
     """
-    
-    for fullname, loc in loc_dict.items():
-        file_path = Path(loc["file_path"])
+    for fullname, meta in program_meta.items():
+        file_path = Path(meta.file_path)
         if not file_path.exists():
             continue
         with open(file_path, 'r') as f:
@@ -357,11 +351,7 @@ def remove_decorators(loc_dict, decorator="@funsearch.hotswap"):
                 decorator_lines.append(i)
 
         for line_no in decorator_lines:
-            # Remove the decorator line
-            if loc["class"]:
-                lines[line_no] = "\n"
-            else:
-                lines[line_no] = "\n"
+            lines[line_no] = "\n"
         
         with open(file_path, 'w') as f:
             f.writelines(lines)
@@ -374,9 +364,9 @@ if __name__ == "__main__":
     parser.add_argument("--args", nargs="*", help="arguments to pass to file")
     args = parser.parse_args()
 
-    spec_structured, path, loc_dict = extract_code(Path(args.file), args.args)
+    spec_structured, path, program_meta = extract_code(Path(args.file), args.args)
 
     print(spec_structured)
 
-    add_decorators(loc_dict)
-    remove_decorators(loc_dict)
+    add_decorators(program_meta)
+    remove_decorators(program_meta)

@@ -22,3 +22,5 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+examples/astropy_example/repo/*
