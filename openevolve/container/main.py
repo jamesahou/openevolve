@@ -1,6 +1,6 @@
 """This file will be used as an executable script by the ContainerSandbox and ExternalProcessSandbox."""
 
-from funsearch.code_manipulation import yield_decorated
+from openevolve.code_manipulation import yield_decorated
 
 from importlib.util import spec_from_file_location, module_from_spec
 

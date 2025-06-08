@@ -23,9 +23,9 @@ import time
 import logging
 from openai import OpenAI
 
-from funsearch import evaluator2
-from funsearch import programs_database
-from funsearch.structured_outputs import ProgramImplementation
+from openevolve import evaluator2
+from openevolve import programs_database
+from openevolve.structured_outputs import ProgramImplementation
 
 import os
 from pathlib import Path
@@ -157,7 +157,7 @@ class Sampler:
 if __name__ == "__main__":
     from pathlib import Path
     import logging
-    from funsearch import extractor, project_indexer, code_manipulation_2
+    from openevolve import extractor, project_indexer, code_manipulation_2
     import pathlib
 
     logging.basicConfig(level=logging.INFO)

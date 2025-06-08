@@ -1,5 +1,5 @@
 """Project constants for FunSearch."""
-from funsearch.custom_types import ContainerAbsPath
+from openevolve.custom_types import ContainerAbsPath
 
 HOTSWAP_ENVVAR = "FUNSEARCH_HOTSWAP_IMP"
 

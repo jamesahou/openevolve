@@ -5,7 +5,7 @@ import warnings
 import inspect
 import os
 
-from funsearch.constants import HOTSWAP_ENVVAR
+from openevolve.constants import HOTSWAP_ENVVAR
 
 IMPLEMENTATIONS_ROOT = "implementations/"
 PROJECT_ROOT = "workspace/"

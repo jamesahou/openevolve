@@ -11,9 +11,9 @@ import ast
 
 from typing import List, Any
 
-from funsearch.structured_outputs import ProgramImplementation, FunctionImplementation
-from funsearch.custom_types import FullName, FuncMeta, HostAbsPath, HostRelPath
-from funsearch.test_case import TestCase
+from openevolve.structured_outputs import ProgramImplementation, FunctionImplementation
+from openevolve.custom_types import FullName, FuncMeta, HostAbsPath, HostRelPath
+from openevolve.test_case import TestCase
 
 builtins._dbg_storage = dict(
     fns_to_evolve=[],

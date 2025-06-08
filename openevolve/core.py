@@ -17,7 +17,7 @@
 import logging
 import time
 
-from funsearch import code_manipulation
+from openevolve import code_manipulation
 from concurrent.futures import ThreadPoolExecutor
 
 

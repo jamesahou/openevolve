@@ -1,12 +1,12 @@
-from funsearch.test_case import TestCase
-from funsearch.constants import (
+from openevolve.test_case import TestCase
+from openevolve.constants import (
     HOTSWAP_ENVVAR,
     SANDBOX_IMAGE_NAME,
     SANDBOX_CONTAINER_NAME,
     INPUTS_CONTAINER_PATH,
     CONTAINER_PYTHONPATH,
 )
-from funsearch.custom_types import (
+from openevolve.custom_types import (
     HostAbsPath,
     HostRelPath,
     ContainerAbsPath,
@@ -426,8 +426,8 @@ if __name__ == "__main__":
     # Set log level to DEBUG for detailed output
     logging.basicConfig(level=logging.DEBUG)
 
-    import funsearch.extractor as extractor
-    from funsearch.evaluator2 import ImplementationsManager
+    import openevolve.extractor as extractor
+    from openevolve.evaluator2 import ImplementationsManager
     from pathlib import Path
 
     workspace_root = Path("/Users/ryanrudes/openevolve/astropy")

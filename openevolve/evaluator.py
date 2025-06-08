@@ -20,9 +20,9 @@ from collections.abc import Sequence
 import copy
 from typing import Any, Tuple
 
-from funsearch import code_manipulation
-from funsearch import programs_database
-from funsearch import sandbox
+from openevolve import code_manipulation
+from openevolve import programs_database
+from openevolve import sandbox
 
 """
   Regex to find all methods named 'priority_vX'.

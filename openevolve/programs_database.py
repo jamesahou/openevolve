@@ -26,9 +26,8 @@ from absl import logging
 import numpy as np
 import scipy
 
-from funsearch import code_manipulation_2
-from funsearch import config as config_lib
-from funsearch.project_indexer import ProjectIndexer
+from openevolve import code_manipulation
+from openevolve import config as config_lib
 
 Signature = tuple[float, ...]
 ScoresPerTest = Mapping[Any, float]
@@ -58,7 +57,7 @@ def _get_signature(scores_per_test: ScoresPerTest) -> Signature:
   """Represents test scores as a canonical signature."""
   return tuple(scores_per_test[k] for k in sorted(scores_per_test.keys()))
 
-#TODO: FIX
+
 @dataclasses.dataclass(frozen=True)
 class Prompt:
   """A prompt produced by the ProgramsDatabase, to be sent to Samplers.
@@ -81,37 +80,34 @@ class ProgramsDatabase:
   def __init__(
       self,
       config: config_lib.ProgramsDatabaseConfig,
-      template: code_manipulation_2.Program,
-      worskpace: pathlib.Path,
+      template: code_manipulation.Program,
+      function_to_evolve: str,
       identifier: str = "",
   ) -> None:
     self._config: config_lib.ProgramsDatabaseConfig = config
-    self._template: code_manipulation_2.Program = template
-    
-    self._last_reset_time: float = time.time()
-    self._program_counter = 0
-    self._backups_done = 0
-    self.identifier = identifier
-    self.workspace = worskpace
-    
-    self._file_hierarchy = ProjectIndexer.get_tree_description(self._template)
+    self._template: code_manipulation.Program = template
+    self._function_to_evolve: str = function_to_evolve
 
     # Initialize empty islands.
     self._islands: list[Island] = []
     for _ in range(config.num_islands):
       self._islands.append(
-          Island(template, self._file_hierarchy, config.functions_per_prompt,
+          Island(template, function_to_evolve, config.functions_per_prompt,
                  config.cluster_sampling_temperature_init,
-                 config.cluster_sampling_temperature_period, self.workspace))
+                 config.cluster_sampling_temperature_period))
     self._best_score_per_island: list[float] = (
         [-float('inf')] * config.num_islands)
-    self._best_program_per_island: list[code_manipulation_2.Program | None] = (
+    self._best_program_per_island: list[code_manipulation.Function | None] = (
         [None] * config.num_islands)
     self._best_scores_per_test_per_island: list[ScoresPerTest | None] = (
         [None] * config.num_islands)
 
+    self._last_reset_time: float = time.time()
+    self._program_counter = 0
+    self._backups_done = 0
+    self.identifier = identifier
 
-  def get_best_programs_per_island(self) -> Iterable[Tuple[code_manipulation_2.Program | None]]:
+  def get_best_programs_per_island(self) -> Iterable[Tuple[code_manipulation.Function | None]]:
     return sorted(zip(self._best_program_per_island, self._best_score_per_island), key=lambda t: t[1], reverse=True)
 
   def save(self, file):
@@ -129,7 +125,7 @@ class ProgramsDatabase:
       setattr(self, key, data[key])
 
   def backup(self):
-    filename = f"program_db_{self.identifier}_{self._backups_done}.pickle"
+    filename = f"program_db_{self._function_to_evolve}_{self.identifier}_{self._backups_done}.pickle"
     p = pathlib.Path(self._config.backup_folder)
     if not p.exists():
       p.mkdir(parents=True, exist_ok=True)
@@ -148,7 +144,7 @@ class ProgramsDatabase:
 
   def _register_program_in_island(
       self,
-      program: code_manipulation_2.Program,
+      program: code_manipulation.Function,
       island_id: int,
       scores_per_test: ScoresPerTest,
   ) -> None:
@@ -163,7 +159,7 @@ class ProgramsDatabase:
 
   def register_program(
       self,
-      program: code_manipulation_2.Program,
+      program: code_manipulation.Function,
       island_id: int | None,
       scores_per_test: ScoresPerTest,
   ) -> None:
@@ -202,12 +198,10 @@ class ProgramsDatabase:
     for island_id in reset_islands_ids:
       self._islands[island_id] = Island(
           self._template,
-          self._file_hierarchy,
+          self._function_to_evolve,
           self._config.functions_per_prompt,
           self._config.cluster_sampling_temperature_init,
-          self._config.cluster_sampling_temperature_period,
-          self.workspace
-      )
+          self._config.cluster_sampling_temperature_period)
       self._best_score_per_island[island_id] = -float('inf')
       founder_island_id = np.random.choice(keep_islands_ids)
       founder = self._best_program_per_island[founder_island_id]
@@ -220,15 +214,14 @@ class Island:
 
   def __init__(
       self,
-      template: code_manipulation_2.Program,
-      file_hierarchy: str,
+      template: code_manipulation.Program,
+      function_to_evolve: str,
       functions_per_prompt: int,
       cluster_sampling_temperature_init: float,
       cluster_sampling_temperature_period: int,
-      workspace: pathlib.Path,
   ) -> None:
-    self._template: code_manipulation_2.Program = template
-    self._file_hierarchy = file_hierarchy
+    self._template: code_manipulation.Program = template
+    self._function_to_evolve: str = function_to_evolve
     self._functions_per_prompt: int = functions_per_prompt
     self._cluster_sampling_temperature_init = cluster_sampling_temperature_init
     self._cluster_sampling_temperature_period = (
@@ -236,11 +229,10 @@ class Island:
 
     self._clusters: dict[Signature, Cluster] = {}
     self._num_programs: int = 0
-    self.workspace = workspace
 
   def register_program(
       self,
-      program: code_manipulation_2.Program,
+      program: code_manipulation.Function,
       scores_per_test: ScoresPerTest,
   ) -> None:
     """Stores a program on this island, in its appropriate cluster."""
@@ -284,34 +276,49 @@ class Island:
     return self._generate_prompt(sorted_implementations), version_generated
 
   def _generate_prompt(
-    self, 
-    implementations: Sequence[code_manipulation_2.Program]) -> str:
-    
-    implementations = copy.deepcopy(implementations)
-    prompt = f"# File Hierarchy \n{self._file_hierarchy}\n\n"
-    for program_version, implementation in enumerate(implementations):
-      prompt += f"# Start of Program  Version {program_version} (*_v{program_version})\n"
-      if program_version >= 1:
-        prompt += f"# This is an improved version of the previous program (*_v{program_version - 1})\n\n"
+      self,
+      implementations: Sequence[code_manipulation.Function]) -> str:
+    """Creates a prompt containing a sequence of function `implementations`."""
+    implementations = copy.deepcopy(implementations)  # We will mutate these.
 
-      for function in implementation.functions:
-        path = pathlib.Path(function.path).relative_to(self.workspace)
-        func_loc_comment = f"#{path}: {function.qualname} ({function.decorator if function.decorator else ''}\n)"
-        prompt += f"{func_loc_comment}\n"
+    # Format the names and docstrings of functions to be included in the prompt.
+    versioned_functions: list[code_manipulation.Function] = []
+    for i, implementation in enumerate(implementations):
+      new_function_name = f'{self._function_to_evolve}_v{i}'
+      implementation.name = new_function_name
+      # Update the docstring for all subsequent functions after `_v0`.
+      if i >= 1:
+        implementation.docstring = (
+            f'Improved version of `{self._function_to_evolve}_v{i - 1}`.')
+      # If the function is recursive, replace calls to itself with its new name.
+      implementation = code_manipulation.rename_function_calls(
+          str(implementation), self._function_to_evolve, new_function_name)
+      versioned_functions.append(
+          code_manipulation.text_to_function(implementation))
 
-        func_str = function.to_str(version=program_version)
-        prompt += f"{func_str}\n\n"
+    # Create the header of the function to be generated by the LLM.
+    next_version = len(implementations)
+    new_function_name = f'{self._function_to_evolve}_v{next_version}'
+    header = dataclasses.replace(
+        implementations[-1],
+        name=new_function_name,
+        body='',
+        docstring=('Improved version of '
+                   f'`{self._function_to_evolve}_v{next_version - 1}`.'),
+    )
+    versioned_functions.append(header)
 
-      prompt += f"# End of Program Version {program_version}\n\n"
+    # Replace functions in the template with the list constructed here.
+    prompt = dataclasses.replace(self._template, functions=versioned_functions)
+    return str(prompt)
 
-    return prompt
 
 class Cluster:
   """A cluster of programs on the same island and with the same Signature."""
 
-  def __init__(self, score: float, implementation: code_manipulation_2.Program):
+  def __init__(self, score: float, implementation: code_manipulation.Function):
     self._score = score
-    self._programs: list[code_manipulation_2.Program] = [implementation]
+    self._programs: list[code_manipulation.Function] = [implementation]
     self._lengths: list[int] = [len(str(implementation))]
 
   @property
@@ -319,12 +326,12 @@ class Cluster:
     """Reduced score of the signature that this cluster represents."""
     return self._score
 
-  def register_program(self, program: code_manipulation_2.Program) -> None:
+  def register_program(self, program: code_manipulation.Function) -> None:
     """Adds `program` to the cluster."""
     self._programs.append(program)
     self._lengths.append(len(str(program)))
 
-  def sample_program(self) -> code_manipulation_2.Program:
+  def sample_program(self) -> code_manipulation.Function:
     """Samples a program, giving higher probability to shorther programs."""
     normalized_lengths = (np.array(self._lengths) - min(self._lengths)) / (
         max(self._lengths) + 1e-6)

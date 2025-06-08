@@ -1,4 +1,4 @@
-from funsearch.structured_outputs import ProgramImplementation
+from openevolve.structured_outputs import ProgramImplementation
 
 import dataclasses
 import io
@@ -7,7 +7,7 @@ import textwrap
 from typing import List, Tuple, Sequence, Any, Dict, Iterable
 import re
 from enum import Enum
-from funsearch.custom_types import FullName, FuncMeta
+from openevolve.custom_types import FullName, FuncMeta
 
 @dataclasses.dataclass
 class FuncHeader:

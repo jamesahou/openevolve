@@ -11,18 +11,18 @@ from openai import OpenAI
 
 from dotenv import load_dotenv
 from typing import List
-from funsearch.test_case import TestCase
+from openevolve.test_case import TestCase
 
 import tempfile
 
-from funsearch.custom_types import (
+from openevolve.custom_types import (
     HostAbsPath,
     HostRelPath,
     ContainerAbsPath,
     ContainerRelPath
 )
 # from funsearch import config, core, sandbox, sampler, programs_database, code_manipulation, evaluator, extractor
-from funsearch import config, core, sandbox, sampler, programs_database_2, code_manipulation_2, evaluator2, extractor
+from openevolve import config, core, sandbox, sampler, programs_database_2, code_manipulation_2, evaluator2, extractor
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)

@@ -1,5 +1,5 @@
 """Class for evaluating programs proposed by the Sampler."""
-from funsearch.code_manipulation_2 import (
+from openevolve.code_manipulation_2 import (
     Function,
     Program,
     header_from_str,
@@ -7,14 +7,14 @@ from funsearch.code_manipulation_2 import (
     structured_output_to_prog_meta
 )
 
-from funsearch.custom_types import FullName, FuncMeta
+from openevolve.custom_types import FullName, FuncMeta
 
-from funsearch import code_manipulation
-from funsearch import programs_database_2
-from funsearch import sandbox
+from openevolve import code_manipulation
+from openevolve import programs_database_2
+from openevolve import sandbox
 
-from funsearch.structured_outputs import ProgramImplementation
-from funsearch.test_case import TestCase
+from openevolve.structured_outputs import ProgramImplementation
+from openevolve.test_case import TestCase
 
 from typing import Any, Dict
 from collections.abc import Sequence

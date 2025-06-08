@@ -1,4 +1,4 @@
-from funsearch.code_manipulation_2 import Program, Function, Decorator, str_to_functions
+from openevolve.code_manipulation_2 import Program, Function, Decorator, str_to_functions
 from typing import Iterable
 from enum import Enum
 import os
