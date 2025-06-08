@@ -38,6 +38,15 @@ COPY ${SETUP_FILE} /setup.sh
 COPY ${PROJECT_ROOT} /workspace
 COPY ${EVAL_FILE} /eval.py
 
+# Install git
+RUN apt-get update && \
+    apt-get install -y git
+
+# Clone the main entry point gist
+RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /openevolve_gists
+RUN mv /openevolve_gists/openevolve_sandbox_main.py /main.py
+RUN rm -rf /openevolve_gists
+
 COPY ./funsearch/container/main.py /main.py
 
 COPY . /openevolve
