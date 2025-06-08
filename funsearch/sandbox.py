@@ -1,5 +1,17 @@
 from funsearch.test_case import TestCase
-from funsearch.constants import HOTSWAP_ENVVAR
+from funsearch.constants import (
+    HOTSWAP_ENVVAR,
+    SANDBOX_IMAGE_NAME,
+    SANDBOX_CONTAINER_NAME,
+    INPUTS_CONTAINER_PATH,
+    CONTAINER_PYTHONPATH,
+)
+from funsearch.custom_types import (
+    HostAbsPath,
+    HostRelPath,
+    ContainerAbsPath,
+    ContainerRelPath,
+)
 
 from enum import StrEnum
 from typing import Any
@@ -10,13 +22,20 @@ import logging
 import pathlib
 import shutil
 import sys
-import ast
 import os
 
-CONTAINER_MAIN = "/main.py"
+class DummySandbox:
+    """Base class for Sandboxes that execute the generated code."""
+    sandboxes = 0
 
-IMAGE_NAME = "funsearch_sandbox"
-CONTAINER_NAME = "funsearch_container"
+    def __init__(self, **kwargs):
+        self.sandbox_id = self.register_sandbox()
+
+    def register_sandbox(self) -> int:
+        """Register this sandbox in the global list of sandboxes."""
+        sandbox_id = DummySandbox.sandboxes
+        DummySandbox.sandboxes += 1
+        return sandbox_id
 
 class ContainerEngine(StrEnum):
     """Enum for container engines."""
@@ -25,7 +44,7 @@ class ContainerEngine(StrEnum):
 
 DEFAULT_CONTAINER_ENGINE = ContainerEngine.DOCKER
 
-class ContainerSandbox:
+class ContainerSandbox(DummySandbox):
     """
     Basic sandbox that runs unsafe code in Podman or Docker container.
     - the sandbox should be safe against inadvertent bad code by LLM but not against malicious attacks.
@@ -34,7 +53,71 @@ class ContainerSandbox:
     - might provide easier or more lightweight debugging experience than some other fancier sandbox environments
     """
     engine: ContainerEngine = DEFAULT_CONTAINER_ENGINE
-    built = False
+
+    def __init__(
+        self,
+        project_root: HostAbsPath,
+        imps_path: HostAbsPath,
+        eval_file: HostRelPath,
+        python_path: HostAbsPath = CONTAINER_PYTHONPATH,
+        setup_file: HostAbsPath | None = None,
+        force_rebuild_container: bool = False,
+    ):
+        """
+        Initializes the container sandbox.
+
+        Args:
+            project_root (HostAbsPath): The absolute path to the project root on the host.
+            imps_path (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+            eval_file (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
+            python_path (HostAbsPath): The absolute path to the Python interpreter to use on the host. Defaults to `CONTAINER_PYTHONPATH`.
+            setup_file (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
+            force_rebuild_container (bool): If True, forces the rebuild of the container, even if it already exists.
+        """
+        super().__init__()
+
+        self.project_root = project_root
+        self.imps_path = imps_path
+        self.python_path = python_path
+        self.eval_file = eval_file
+        self.setup_file = setup_file
+
+        # Check if setup_file is a shell script
+        if setup_file is not None and (not setup_file.is_file() or setup_file.suffix != ".sh"):
+            raise ValueError(
+                f"setup_file must be a shell script, got {setup_file.suffix}"
+            )
+
+        # Check that the evaluation entry point is a Python file
+        if not eval_file.is_file() or eval_file.suffix != ".py":
+            raise ValueError(
+                f"eval_file must be a Python file, got {eval_file.suffix}"
+            )
+
+        if not (project_root / eval_file).exists():
+            raise FileNotFoundError(
+                f"Evaluation file {eval_file} does not exist in the project root {project_root}."
+            )
+
+        if self.sandbox_id != 0:
+            return
+
+        # Check if the container image already exists
+        # If it does, we can skip the build step unless forced to rebuild
+        if force_rebuild_container or not self.container_exists():
+            # If the container already exists, remove it
+            self.remove_container()
+
+            # Build the container image
+            self.build_image(
+                self.project_root,
+                self.imps_path,
+                self.eval_file,
+                self.setup_file,
+            )
+
+        # Start the container if it is not already running
+        self.start_container()
 
     @staticmethod
     def has_engine(engine: ContainerEngine) -> bool:
@@ -45,6 +128,7 @@ class ContainerSandbox:
     @classmethod
     def use_engine(cls, engine: ContainerEngine):
         """Sets the container engine to the specified one."""
+        logging.debug(f"Using container engine: {engine.value}")
         cls.engine = engine
 
     @classmethod
@@ -54,24 +138,35 @@ class ContainerSandbox:
         return cls.engine.value
 
     @classmethod
-    def select_engine(cls):
+    def select_engine(cls) -> ContainerEngine:
         """Selects the container engine to use."""
-        logging.debug("Checking for Podman...")
+        if cls.has_engine(ContainerEngine.DOCKER):
+            engine = ContainerEngine.DOCKER
+        elif cls.has_engine(ContainerEngine.PODMAN):
+            engine = ContainerEngine.PODMAN
+        else:
+            raise Exception("Could not find Podman or Docker. Cannot create sandbox.")
 
-        if not cls.has_engine(ContainerEngine.PODMAN):
-            logging.debug("Podman not found, checking for Docker...")
-
-            if cls.has_engine(ContainerEngine.DOCKER):
-                logging.debug("Docker found, using it instead of Podman.")
-                cls.use_engine(ContainerEngine.DOCKER)
-            else:
-                raise Exception(
-                    "Could not find Podman or Docker. Can not use ContainerSandbox."
-                )
+        cls.use_engine(engine)
+        return engine
 
     @classmethod
-    def build_image(cls, workspace_path: pathlib.Path, implementations_path: pathlib.Path, eval_file: pathlib.Path, setup_file: pathlib.Path | None = None):
-        """Builds the container image."""
+    def build_image(
+        cls,
+        project_root: HostAbsPath,
+        imps_path: HostAbsPath,
+        eval_file: HostRelPath,
+        setup_file: HostAbsPath | None = None,
+    ):
+        """
+        Builds the container image.
+        
+        Args:
+            project_root (HostAbsPath): The absolute path to the project root on the host.
+            imps_path (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+            eval_file (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
+            setup_file (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
+        """
         version = sys.version.split(" ")[0]
         logging.debug(f"Using Python version: {version}")
 
@@ -98,11 +193,11 @@ class ContainerSandbox:
             # Set the build argument for the Python version
             f"--build-arg PYTHON_VERSION={version} "
             # Set the build argument for the workspace root
-            f"--build-arg WORKSPACE_ROOT={workspace_path} "
+            f"--build-arg PROJECT_ROOT={project_root} "
             # Set the build argument for the evaluation entry point
-            f"--build-arg EVAL_FILE={eval_file} "
+            f"--build-arg EVAL_FILE={project_root / eval_file} "
             # Tag the image with the name
-            f"-t {IMAGE_NAME} "
+            f"-t {SANDBOX_IMAGE_NAME} "
             # Use the Dockerfile from the container directory
             f"-f {dockerfile} {build_context} "
             # Add any extra build arguments, such as the setup file
@@ -133,7 +228,6 @@ class ContainerSandbox:
 
         # Complete the image build process
         logging.debug("Container image built successfully.")
-        cls.built = True
 
     @classmethod
     def upload_test_cases(cls, test_cases: list[TestCase]):
@@ -164,8 +258,9 @@ class ContainerSandbox:
 
             # Use the container engine to copy files to the container
             cmd = (
-                f"{cls.executable} cp {temp_dir}/. "
-                f"{CONTAINER_NAME}:/inputs"
+                f"{cls.executable} "
+                f"cp {temp_dir}/. "
+                f"{SANDBOX_CONTAINER_NAME}:{INPUTS_CONTAINER_PATH}"
             )
 
             logging.debug(f"Copying test cases to container: {cmd}")
@@ -177,53 +272,41 @@ class ContainerSandbox:
             # Remove the temporary directory after copying
             shutil.rmtree(temp_dir)
 
-    def __init__(
-        self,
-        workspace_path: pathlib.Path,
-        eval_file: pathlib.Path,
-        implementations_path: pathlib.Path,
-        python_path: str = "/usr/local/bin/python3",
-        setup_file: pathlib.Path | None = None,
-    ):
+    @classmethod
+    def image_exists(cls) -> bool:
         """
-        Initializes the container sandbox.
+        Checks if the container image exists.
 
-        Args:
-            workspace_path (pathlib.Path): The absolute path to the modified workspace root on the host.
-            eval_file (pathlib.Path): The path to the evaluation entry point Python file on the host.
-            implementations_path (pathlib.Path): The path to the implementations directory on the host.
-            python_path (str): The path to the Python interpreter to use. Defaults to "python".
-            setup_file (pathlib.Path | None): The path to the setup file for installation, located on the host. This will be copied to the container.
+        Returns:
+            bool: True if the image exists, False otherwise.
         """
-        super().__init__()
+        cmd = f"{cls.executable} image ls {SANDBOX_IMAGE_NAME} -q"
+        result = os.popen(cmd).read().strip()
+        return bool(result)
 
-        self.workspace_path = workspace_path
-        self.python_path = python_path
-        self.implementations_path = implementations_path
-        self.eval_file = eval_file
-        self.setup_file = setup_file
-
-        # Check if setup_file is a shell script
-        if setup_file is not None and setup_file.suffix != ".sh":
-            raise ValueError(
-                f"setup_file must be a shell script, got {setup_file.suffix}"
-            )
-
-        # Check that the evaluation entry point is a Python file
-        if not eval_file.is_file() or eval_file.suffix != ".py":
-            raise ValueError(
-                f"eval_file must be a Python file, got {eval_file.suffix}"
-            )
-
+    @classmethod
+    def container_exists(cls) -> bool:
         """
-        # Build the container image if it has not been built yet
-        if ContainerSandbox.built:
-            logging.warning("Container image already built! Skipping build.")
+        Checks if the container exists.
+
+        Returns:
+            bool: True if the container exists, False otherwise.
+        """
+        cmd = f"{cls.executable} container ls"
+        result = os.popen(cmd).read().strip()
+        return SANDBOX_CONTAINER_NAME in result
+
+    @classmethod
+    def remove_container(cls):
+        """
+        Removes the container if it exists.
+        """
+        if cls.container_exists():
+            cmd = f"{cls.executable} rm -f {SANDBOX_CONTAINER_NAME}"
+            logging.debug(f"Removing container: {cmd}")
+            os.system(cmd)
         else:
-            ContainerSandbox.build_image(workspace_path, implementations_path, eval_file, setup_file)
-        """
-
-        ContainerSandbox.start_container()
+            logging.debug("No container to remove.")
 
     @classmethod
     def start_container(cls):
@@ -233,7 +316,7 @@ class ContainerSandbox:
         """
         cmd = (
             f"{cls.executable} start "
-            f"{CONTAINER_NAME}"
+            f"{SANDBOX_CONTAINER_NAME}"
         )
 
         logging.debug(f"Executing: {cmd}")
