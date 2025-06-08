@@ -7,6 +7,7 @@ import textwrap
 from typing import List, Tuple, Sequence, Any, Dict, Iterable
 import re
 from enum import Enum
+from types import FullName
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -188,63 +189,41 @@ def str_to_program(
 
 def structured_output_to_functions(
     structured_output: ProgramImplementation,
-) -> dict[str, Function]:
+) -> dict[FullName, Function]:
     """Given a structured output from the LLM, returns a mapping from function qualnames to Function objects."""
     functions: Dict[str, Function] = {}
     for structured_function in structured_output.functions:
         function = str_to_function(structured_function.code)
         function.path = structured_function.filepath
-        functions[structured_function.qualname] = function
+        functions[structured_function.filepath + ' ' + structured_function.qualname] = function
     return functions
 
 
 def header_from_str(header_str: str) -> FuncHeader:
     """Parse a function header from a string."""
-    header_str = header_str.strip()
-    match = re.match(r"def (\w+)\((.*?)\)(?: -> (\w+))?:", header_str)
-    if not match:
-        raise ValueError(f"Invalid function header: {header_str}")
-
-    name = match.group(1)
-    args = [arg.strip() for arg in match.group(2).split(",") if arg.strip()]
-    return_type = match.group(3) or ""
-
-    return FuncHeader(name=name, args=args, return_type=return_type)
+    func = str_to_function(header_str)
+    return func.header
 
 def structured_output_to_prog_meta(
-    structured_output: Dict[str, str],
-    program_meta: Dict[str, Any],
+    structured_output: ProgramImplementation,
+    program_meta: Dict[FullName, Any],
 ) -> Program:
     """Given a structured output from the LLM and program metadata, returns a Program object."""
 
     # Check if the sample contains all the expected keys
-    expected_names = set(program_meta.keys())
-    if not set(structured_output.keys()) == expected_names:
+    expected_keys = set(program_meta.keys())
+    actual_keys = {f.filepath + ' ' + f.qualname for f in structured_output.functions}
+    if expected_keys != actual_keys:
         raise ValueError(
-            f"Sample keys do not match expected function names. Expected: {expected_names}, got: {sample.keys()}"
+            f"Expected keys {expected_keys} but got {actual_keys} in structured output."
         )
-
+    
     functions = structured_output_to_functions(structured_output)
-    func_headers = [str(f.header) for f in functions.values()]
-    expected_headers = [
-        str(header_from_str(program_meta[name]["header"])) for name in expected_names
-    ]
-
+    
     # check if headers are same
-    if set(func_headers) != set(expected_headers):
-        raise ValueError(
-            f"Function headers do not match expected headers. Expected: {expected_headers}, got: {func_headers}"
-        )
+    expected_headers
 
-    functions = structured_output_to_functions(structured_output)
 
-    for func_name, function in functions.items():
-        if func_name not in program_meta:
-            raise ValueError(f"Function {func_name} not found in program metadata.")
-        meta = program_meta[func_name]
-        function.path = meta["file_path"]
-        function.line_no = meta["line_no"]
-        function.qualname = func_name
+    
 
-    return Program(functions=list(functions.values()))
   

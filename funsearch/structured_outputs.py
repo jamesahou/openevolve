@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class FunctionImplementation(BaseModel):
     """
     Represents the implementation details of a function.
@@ -13,7 +14,8 @@ class FunctionImplementation(BaseModel):
     code: str = Field(
         description="The source code of the function implementation."
     )
-
+    
+@dataclasses.dataclass
 class ProgramImplementation(BaseModel):
     """
     Represents the implementation details of a structured output.

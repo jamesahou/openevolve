@@ -158,6 +158,7 @@ class Evaluator:
       sample: str,
       island_id: int | None,
       version_generated: int | None,
+      curr_id: str
   ) -> None:
     """Compiles the sample into a program and executes it on test inputs."""
     new_function, program = _sample_to_program(
@@ -166,7 +167,7 @@ class Evaluator:
     scores_per_test = {}
     for current_input in self._inputs:
       test_output, runs_ok = self._sandbox.run(
-          program, self._function_to_run, current_input, self._timeout_seconds)
+          program, self._function_to_run, current_input, self._timeout_seconds, curr_id)
       if (runs_ok and not _calls_ancestor(program, self._function_to_evolve)
           and test_output is not None):
         if not isinstance(test_output, (int, float)):
