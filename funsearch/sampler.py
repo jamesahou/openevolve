@@ -25,6 +25,7 @@ from openai import OpenAI
 
 from funsearch import evaluator2
 from funsearch import programs_database
+from funsearch.structured_outputs import ProgramImplementation
 
 
 class LLM:
@@ -67,20 +68,20 @@ class vLLM:
         self.model = model
         self.prompt_count = 0
 
-    def draw_samples(self, prompt: str) -> list[str | None]:
+    def draw_samples(self, prompt: str) -> list[ProgramImplementation | None]:
         """Batch processes multiple prompts at once."""
-        responses = self.client.chat.completions.create(
+        responses = self.client.beta.chat.completions.parse(
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=4000,
+            messages=[
+                {"role": "system", "content": "You are an expert iterative code-evolution assistant. For each provided function analyse the existing version(s) and improve them, optimize for clarity, performance, and correctness while preserving the existing codebase structure. NEVER CHANGE THE FUNCTION NAME OR HEADER."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format=ProgramImplementation,
             n=self.samples_per_prompt,
         )
-
-        response_msgs = [choice.message.content for choice in responses.choices]
-
+        response_msgs = [choice.message.parsed for choice in responses.choices]
         for msg in response_msgs:
             self._log(prompt, msg)
-
         return response_msgs
 
     def _log(self, prompt: str, response: str):
@@ -136,3 +137,51 @@ class Sampler:
 
         # Log timing results
         avg_eval_time = sum(eval_times) / len(eval_times)
+
+if __name__ == "__main__":
+    from pathlib import Path
+    import logging
+    from funsearch import extractor, project_indexer, code_manipulation_2
+    import pathlib
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info("Sampler module loaded successfully.")
+
+    model = vLLM(
+        samples_per_prompt=2,
+        key="",
+        url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        model="gemini-2.0-flash-lite",
+        log_path=Path("logs") 
+    )
+
+    eval_path = pathlib.Path("examples/astropy_example/repo/astropy/eval.py")
+    args = [0]
+    base_dir = pathlib.Path("/Users/jameshou/Documents/Code/openevolve/examples/astropy_example/repo/astropy")
+
+    spec_structured, path, program_meta = extractor.extract_code(eval_path, args)
+
+    program = code_manipulation_2.structured_output_to_prog_meta(spec_structured, program_meta)
+    file_hierarchy = project_indexer.ProjectIndexer.get_tree_description(program, base_dir)
+
+    def build_prompt_from_spec_structured(program, file_hierarchy: str = "# File Hierarchy\n") -> str:
+        prompt = f"{file_hierarchy}\n"
+        prompt += "# Start of Program Version 0 (*_v0)\n"
+        for function in program.functions:
+            func_loc_comment = f"#{pathlib.Path(function.path).relative_to(base_dir)}: {function.qualname}\n"
+            prompt += f"{func_loc_comment}\n"
+            prompt += f"{function.to_str(version=0)}\n\n"
+        prompt += "# End of Program Version 0\n\n"
+        return prompt
+
+    prompt = build_prompt_from_spec_structured(program, file_hierarchy)
+
+    logger.info("Prompt built successfully.")
+
+    samples = model.draw_samples(prompt)
+
+    import pickle
+
+    with open("samples.pkl", "wb") as f:
+        pickle.dump(samples, f)
