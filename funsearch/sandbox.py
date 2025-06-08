@@ -139,7 +139,7 @@ class ContainerSandbox(DummySandbox):
                 )
 
     @classmethod
-    def build_image(cls, workspace_path: pathlib.Path, eval_file: pathlib.Path, setup_file: pathlib.Path | None = None):
+    def build_image(cls, workspace_path: pathlib.Path, implementations_path: pathlib.Path, eval_file: pathlib.Path, setup_file: pathlib.Path | None = None):
         """Builds the container image."""
         version = sys.version.split(" ")[0]
         logging.debug(f"Using Python version: {version}")
@@ -167,6 +167,8 @@ class ContainerSandbox(DummySandbox):
             f"--build-arg WORKSPACE_ROOT={workspace_path} "
             # Set the build argument for the evaluation entry point
             f"--build-arg EVAL_FILE={eval_file} "
+            # Mount the implementations path from the host to /implementations in the container
+            f"-v {implementations_path}:/implementations:ro "
             # Tag the image with the name
             f"-t {IMAGE_NAME} "
             # Use the Dockerfile from the container directory
@@ -229,6 +231,7 @@ class ContainerSandbox(DummySandbox):
         self,
         workspace_path: pathlib.Path,
         eval_file: pathlib.Path,
+        implementations_path: pathlib.Path,
         python_path: str = "/usr/local/bin/python3",
         setup_file: pathlib.Path | None = None,
     ):
@@ -238,6 +241,7 @@ class ContainerSandbox(DummySandbox):
         Args:
             workspace_path (pathlib.Path): The absolute path to the modified workspace root on the host.
             eval_file (pathlib.Path): The path to the evaluation entry point Python file on the host.
+            implementations_path (pathlib.Path): The path to the implementations directory on the host.
             python_path (str): The path to the Python interpreter to use. Defaults to "python".
             setup_file (pathlib.Path | None): The path to the setup file for installation, located on the host. This will be copied to the container.
         """
@@ -245,9 +249,10 @@ class ContainerSandbox(DummySandbox):
 
         self.workspace_path = workspace_path
         self.python_path = python_path
+        self.implementations_path = implementations_path
         self.eval_file = eval_file
         self.setup_file = setup_file
-        
+
         # Check if setup_file is a shell script
         if setup_file is not None and setup_file.suffix != ".sh":
             raise ValueError(
@@ -264,7 +269,7 @@ class ContainerSandbox(DummySandbox):
         if ContainerSandbox.built:
             logging.warning("Container image already built! Skipping build.")
         else:
-            ContainerSandbox.build_image(workspace_path, eval_file, setup_file)
+            ContainerSandbox.build_image(workspace_path, implementations_path, eval_file, setup_file)
 
     def execute(
         self,
