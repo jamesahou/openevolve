@@ -1,19 +1,20 @@
 from funsearch.test_case import TestCase
+from funsearch.constants import HOTSWAP_ENVVAR
 
 from enum import StrEnum
-
-import logging
-
-import ast
-import os
-import pathlib
-import sys
 from typing import Any
 
-import cloudpickle
+import cloudpickle as pickle
+import tempfile
+import logging
+import pathlib
+import shutil
+import sys
+import ast
+import os
 
 CONTAINER_MAIN = (
-    pathlib.Path(__file__).parent / "container" / "container_main.py"
+    pathlib.Path(__file__).parent / "container" / "main.py"
 ).absolute()
 
 IMAGE_NAME = "funsearch_sandbox"
@@ -44,7 +45,6 @@ class DummySandbox:
         code: str,
         function_name: str,
         test_case: TestCase,
-        timeout: float = 30.0,
     ) -> tuple[Any, bool]:
         """
         Executes a specified function from dynamically compiled code with given arguments.
@@ -53,7 +53,6 @@ class DummySandbox:
             code (str): The source code containing the function to execute.
             function_name (str): The name of the function to invoke from the compiled code.
             test_case (TestCase): The test case containing input arguments and keyword arguments.
-            timeout (float): The maximum time in seconds to allow for the function execution.
 
         Returns:
             tuple[Any, bool]: The result of the function execution and a boolean flag indicating success.
@@ -88,108 +87,6 @@ class DummySandbox:
         exec(compiled_code, namespace)
         return namespace
 
-### TODO: EVERYTHING BELOW THIS
-
-class ExternalProcessSandbox(DummySandbox):
-    """
-    Sandbox that executes the code in a separate Python process in the same host.
-
-    Note: This does not provide real safety and should be only used in an environment where the host process is
-    in some kind of safe sandbox itself (i.e., a container).
-    This kind of sandbox merely makes it more probable that single invalid call does not break the whole
-    funsearch algorithm. It might be easier to set up and thus nice environment to tune the prompts and other code.
-    """
-
-    def __init__(
-        self,
-        base_path: pathlib.Path,
-        python_path: str = "python",
-        timeout: float = 30.0,
-    ):
-        super().__init__()
-
-        self.output_path = pathlib.Path(base_path) / f"sandbox{self.id}"
-        self.python_path = python_path
-        self.timeout = timeout
-        self.call_count = 0
-
-        self.input_path = self.output_path / "inputs"
-        for p in [self.output_path, self.input_path]:
-            if not p.exists():
-                p.mkdir(parents=True)
-
-    def _exec(
-        self,
-        call_data_path: pathlib.Path,
-        stdin: pathlib.Path,
-        stderr: pathlib.Path,
-    ):
-        """
-        Use podman/docker to execute python in a container.
-        - The main.py shall execute the LLM generated method from prog.pickle file providing
-          input.pickle as the input for the method.
-        - main.py writes the output of the method into output.pickle.
-        Everything except the /workspace folder will be read-only so that the environment remains good
-        for future runs.
-        """
-        prog_path = call_data_path / "prog.pickle"
-        output_file = call_data_path / "output.pickle"
-        cmd = (
-            f"{self.python_path} {CONTAINER_MAIN} {prog_path} {stdin} {output_file}"
-            f"  2> {stderr}"
-        )
-        logging.debug(f"Executing: {cmd}")
-        return os.system(cmd)
-
-    def run(
-        self,
-        entry_point: pathlib.Path,
-        implementation_id: str,
-        test_case: TestCase,
-        timeout: float = 30.0,
-    ) -> tuple[Any, bool]:
-        call_data_folder = (self.output_path / f"call{self.call_count}").absolute()
-        if not call_data_folder.exists():
-            call_data_folder.mkdir(exist_ok=True)
-
-        input_hash = hash(test_input)
-        input_path = (self.input_path / f"{input_hash}.pickle").absolute()
-
-        if not input_path.exists():
-            with open(input_path, "wb") as f:
-                cloudpickle.dump(test_input, f)
-        try:
-            namespace = DummySandbox.compile(program)
-
-            prog_file = (call_data_folder / f"prog.pickle").absolute()
-            with open(prog_file, "wb+") as f:
-                cloudpickle.dump(namespace[function_to_run], f)
-
-            error_file = self.output_path / f"stderr_{self.call_count}.log"
-
-            retcode = self._exec(call_data_folder, input_path, error_file)
-            self.call_count += 1
-
-            if retcode != 0:
-                self._save_diagnostics(program, call_data_folder)
-                return None, False
-
-            output_file = call_data_folder / f"output.pickle"
-            with open(output_file, "rb") as f:
-                out = cloudpickle.load(f)
-                return out, True
-        except Exception as e:
-            logging.debug(f"Could not execute code: {e}")
-        self._save_diagnostics(program, call_data_folder)
-        return None, False
-
-    @staticmethod
-    def _save_diagnostics(program: str, output_path: pathlib.Path):
-        filepath = output_path / "program.py"
-        logging.debug(f"Writing program to {filepath}")
-        with open(filepath, "w+") as f:
-            f.write(program)
-
 
 class ContainerEngine(StrEnum):
     """Enum for container engines."""
@@ -198,7 +95,7 @@ class ContainerEngine(StrEnum):
 
 DEFAULT_CONTAINER_ENGINE = ContainerEngine.PODMAN
 
-class ContainerSandbox(ExternalProcessSandbox):
+class ContainerSandbox(DummySandbox):
     """
     Basic sandbox that runs unsafe code in Podman or Docker container.
     - the sandbox should be safe against inadvertent bad code by LLM but not against malicious attacks.
@@ -207,7 +104,7 @@ class ContainerSandbox(ExternalProcessSandbox):
     - might provide easier or more lightweight debugging experience than some other fancier sandbox environments
     """
     engine: ContainerEngine = DEFAULT_CONTAINER_ENGINE
-    image_built = False
+    built = False
 
     @staticmethod
     def has_engine(engine: ContainerEngine) -> bool:
@@ -242,7 +139,7 @@ class ContainerSandbox(ExternalProcessSandbox):
                 )
 
     @classmethod
-    def build_image(cls, workspace_path: pathlib.Path, setup_file: pathlib.Path | None = None):
+    def build_image(cls, workspace_path: pathlib.Path, eval_file: pathlib.Path, setup_file: pathlib.Path | None = None):
         """Builds the container image."""
         version = sys.version.split(" ")[0]
         logging.debug(f"Using Python version: {version}")
@@ -264,10 +161,12 @@ class ContainerSandbox(ExternalProcessSandbox):
         cmd = (
             # Use the container engine to build the image
             f"{cls.executable} build "
-            # Set the build argument for the workspace root
-            f"--build-arg WORKSPACE_ROOT={workspace_path} "
             # Set the build argument for the Python version
             f"--build-arg PYTHON_VERSION={version} "
+            # Set the build argument for the workspace root
+            f"--build-arg WORKSPACE_ROOT={workspace_path} "
+            # Set the build argument for the evaluation entry point
+            f"--build-arg EVAL_FILE={eval_file} "
             # Tag the image with the name
             f"-t {IMAGE_NAME} "
             # Use the Dockerfile from the container directory
@@ -282,38 +181,96 @@ class ContainerSandbox(ExternalProcessSandbox):
 
         # Complete the image build process
         logging.debug("Container image built successfully.")
-        cls.image_built = True
+        cls.built = True
+
+    @classmethod
+    def upload_test_cases(cls, test_cases: list[TestCase]):
+        """
+        Uploads test cases to the container sandbox.
+
+        Args:
+            test_cases (list[TestCase]): List of test cases to upload.
+        """
+        # Create a temporary directory on the host file system
+        # to store the test cases.
+        temp_dir = tempfile.mkdtemp()
+
+        try:
+            # Copy the test case files to the temporary directory
+            for i, test_case in enumerate(test_cases):
+                # Create a unique filename for each test case
+                test_case_file = os.path.join(temp_dir, f"{i}.pickle")
+
+                # Write the test case to a file using cloudpickle
+                with open(test_case_file, "wb") as file:
+                    test_case_dict = {
+                        "args": test_case.args,
+                        "kwargs": test_case.kwargs,
+                    }
+
+                    pickle.dump(test_case_dict, file)
+
+            # Use the container engine to copy files to the container
+            cmd = (
+                f"{cls.executable} cp {temp_dir}:/inputs "
+                f"{IMAGE_NAME}:latest"
+            )
+
+            logging.debug(f"Copying test cases to container: {cmd}")
+            os.system(cmd)
+        except Exception as e:
+            logging.error(f"Failed to upload test cases: {e}")
+            raise
+        finally:
+            # Remove the temporary directory after copying
+            shutil.rmtree(temp_dir)
 
     def __init__(
         self,
         workspace_path: pathlib.Path,
-        python_path: str = "python",
+        eval_file: pathlib.Path,
+        python_path: str = "/usr/local/bin/python3",
         setup_file: pathlib.Path | None = None,
-        timeout: float = 30.0,
     ):
-        """Initializes the container sandbox.
+        """
+        Initializes the container sandbox.
 
         Args:
             workspace_path (pathlib.Path): The absolute path to the modified workspace root on the host.
+            eval_file (pathlib.Path): The path to the evaluation entry point Python file on the host.
             python_path (str): The path to the Python interpreter to use. Defaults to "python".
             setup_file (pathlib.Path | None): The path to the setup file for installation, located on the host. This will be copied to the container.
-            timeout (float): The timeout for the container execution in seconds.
         """
-        super().__init__(workspace_path, python_path, timeout)
+        super().__init__()
 
+        self.workspace_path = workspace_path
+        self.python_path = python_path
+        self.eval_file = eval_file
+        self.setup_file = setup_file
+        
         # Check if setup_file is a shell script
         if setup_file is not None and setup_file.suffix != ".sh":
             raise ValueError(
                 f"setup_file must be a shell script, got {setup_file.suffix}"
             )
 
-        if not ContainerSandbox.image_built:
-            ContainerSandbox.build_image(setup_file)
+        # Check that the evaluation entry point is a Python file
+        if not eval_file.is_file() or eval_file.suffix != ".py":
+            raise ValueError(
+                f"eval_file must be a Python file, got {eval_file.suffix}"
+            )
 
-    def _exec(
+        # Build the container image if it has not been built yet
+        if ContainerSandbox.built:
+            logging.warning("Container image already built! Skipping build.")
+        else:
+            ContainerSandbox.build_image(workspace_path, eval_file, setup_file)
+
+    def execute(
         self,
-        stdin: pathlib.Path,
-        stderr: pathlib.Path,
+        implementation_id: str,
+        test_id: int,
+        timeout: float = 30.0,
     ):
         """
         Use podman/docker to execute python in a container.
@@ -324,14 +281,63 @@ class ContainerSandbox(ExternalProcessSandbox):
         for future runs.
         """
         cmd = (
+            # Use the container engine to run the command
             f"{self.executable} run "
-            f"--stop-timeout={self.timeout} "
-            f"-v {CONTAINER_MAIN}:/main.py:ro "
-            f"-v {call_data_path}:/workspace "
-            f"-v {stdin}:/input.pickle:ro "
-            f"{IMAGE_NAME}:latest /usr/local/bin/python3 "
-            f"/main.py /workspace/prog.pickle /input.pickle /workspace/output.pickle"
-            f"  2> {stderr}"
+            # Set the execution timeout
+            f"--stop-timeout={timeout} "
+            # Set the container to run on
+            f"{IMAGE_NAME}:latest "
+            # Set the environment variable for hot-swapping
+            f"-e {HOTSWAP_ENVVAR}={implementation_id} "
+            # Call the Python interpreter in the container
+            f"{self.python_path} "
+            # Execute the main Python script in the container
+            f"{CONTAINER_MAIN} "
+            # Pass the paths to the eval program, input, and output files
+            f"eval.py "
+            f"/inputs/{test_id}.pickle "
+            f"/outputs/{implementation_id}/output_{test_id}.pickle "
+            # Pipe the standard output to a log file
+            f"> /logs/{implementation_id}/test_{test_id}/stdout.txt "
+            # Pipe the standard error output to a log file
+            f"2> /logs/{implementation_id}/test_{test_id}/stderr.txt "
         )
         logging.debug(f"Executing: {cmd}")
         return os.system(cmd)
+
+    def run(
+        self,
+        implementation_id: str,
+        test_id: int,
+        timeout: float = 30.0,
+    ):
+        """
+        Runs the container sandbox with the specified entry point and implementation ID.
+
+        Args:
+            implementation_id (str): The ID of the implementation to run.
+            test_id (int): The ID of the test case to execute.
+            timeout (float): The maximum time in seconds to allow for the function execution.
+        """
+        self.execute(implementation_id, test_id, timeout)
+
+        # Create a temporary file to store the output
+        output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pickle")
+        
+        # Copy the output file from the container to the host
+        cmd = (
+            f"{self.executable} cp "
+            f"{IMAGE_NAME}:latest:/outputs/{implementation_id}/output_{test_id}.pickle "
+            f"{output_file.name}"
+        )
+        logging.debug(f"Copying output file from container: {cmd}")
+        os.system(cmd)
+
+        # Load the output data from the temporary file
+        with open(output_file.name, "rb") as file:
+            output_data = pickle.load(file)
+
+        # Clean up the temporary file
+        os.remove(output_file.name)
+
+        return output_data
