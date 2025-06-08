@@ -91,7 +91,7 @@ def run(workspace, eval_file, inputs, evolve_depth, model_name, output_path, loa
 
   conf = config.Config(num_evaluators=1)
   database = programs_database_2.ProgramsDatabase(
-    conf.programs_database, template, identifier=timestamp)
+    conf.programs_database, template, worskpace=workspace, identifier=timestamp)
   if load_backup:
     database.load(load_backup)
 

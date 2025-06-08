@@ -82,6 +82,7 @@ class ProgramsDatabase:
       self,
       config: config_lib.ProgramsDatabaseConfig,
       template: code_manipulation_2.Program,
+      worskpace: pathlib.Path,
       identifier: str = "",
   ) -> None:
     self._config: config_lib.ProgramsDatabaseConfig = config
@@ -93,9 +94,9 @@ class ProgramsDatabase:
     self._islands: list[Island] = []
     for _ in range(config.num_islands):
       self._islands.append(
-          Island(template, config.functions_per_prompt,
+          Island(template, self._file_hierarchy, config.functions_per_prompt,
                  config.cluster_sampling_temperature_init,
-                 config.cluster_sampling_temperature_period))
+                 config.cluster_sampling_temperature_period, self.workspace))
     self._best_score_per_island: list[float] = (
         [-float('inf')] * config.num_islands)
     self._best_program_per_island: list[code_manipulation_2.Program | None] = (
@@ -107,6 +108,7 @@ class ProgramsDatabase:
     self._program_counter = 0
     self._backups_done = 0
     self.identifier = identifier
+    self.workspace = worskpace
 
   def get_best_programs_per_island(self) -> Iterable[Tuple[code_manipulation_2.Program | None]]:
     return sorted(zip(self._best_program_per_island, self._best_score_per_island), key=lambda t: t[1], reverse=True)
@@ -199,9 +201,12 @@ class ProgramsDatabase:
     for island_id in reset_islands_ids:
       self._islands[island_id] = Island(
           self._template,
+          self._file_hierarchy,
           self._config.functions_per_prompt,
           self._config.cluster_sampling_temperature_init,
-          self._config.cluster_sampling_temperature_period)
+          self._config.cluster_sampling_temperature_period,
+          self.workspace
+      )
       self._best_score_per_island[island_id] = -float('inf')
       founder_island_id = np.random.choice(keep_islands_ids)
       founder = self._best_program_per_island[founder_island_id]
@@ -219,6 +224,7 @@ class Island:
       functions_per_prompt: int,
       cluster_sampling_temperature_init: float,
       cluster_sampling_temperature_period: int,
+      workspace: pathlib.Path,
   ) -> None:
     self._template: code_manipulation_2.Program = template
     self._file_hierarchy = file_hierarchy
@@ -229,6 +235,7 @@ class Island:
 
     self._clusters: dict[Signature, Cluster] = {}
     self._num_programs: int = 0
+    self.workspace = workspace
 
   def register_program(
       self,
@@ -287,7 +294,8 @@ class Island:
         prompt += f"# This is an improved version of the previous program (*_v{program_version - 1})\n\n"
 
       for function in implementation.functions:
-        func_loc_comment = f"#{function.path}: {function.qualname} ({function.decorator if function.decorator else ''}\n)"
+        path = pathlib.Path(function.path).relative_to(self.workspace)
+        func_loc_comment = f"#{path}: {function.qualname} ({function.decorator if function.decorator else ''}\n)"
         prompt += f"{func_loc_comment}\n"
 
         func_str = function.to_str(version=program_version)
