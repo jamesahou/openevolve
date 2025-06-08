@@ -1,3 +1,5 @@
+from funsearch.structured_outputs import ProgramImplementation
+
 import dataclasses
 import io
 import ast
@@ -5,7 +7,6 @@ import textwrap
 from typing import List, Tuple, Sequence, Any, Dict, Iterable
 import re
 from enum import Enum
-
 
 @dataclasses.dataclass
 class FuncHeader:
@@ -186,12 +187,14 @@ def str_to_program(
 
 
 def structured_output_to_functions(
-    structured_output: Dict[str, str],
+    structured_output: ProgramImplementation,
 ) -> dict[str, Function]:
-    """Given a structured output from the LLM, returns a list of Function objects."""
+    """Given a structured output from the LLM, returns a mapping from function qualnames to Function objects."""
     functions: Dict[str, Function] = {}
-    for func_name, body in structured_output.items():
-        functions[func_name] = str_to_function(body)
+    for structured_function in structured_output.functions:
+        function = str_to_function(structured_function.code)
+        function.path = structured_function.filepath
+        functions[structured_function.qualname] = function
     return functions
 
 
