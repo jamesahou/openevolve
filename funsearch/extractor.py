@@ -244,6 +244,7 @@ class Extractor:
         func_class = dict()
         func_header = dict()
         spec_code = []
+        spec_structured = {}
         # Extract the code in the order of the path
         for qualname in path[-depth:]:
             file_path, line_no, _ = builtins._dbg_storage["fn_locs"][qualname]
@@ -252,6 +253,8 @@ class Extractor:
             if class_name:
                 location_comment += f" | Class: {class_name}"
             spec_code.append(f"{location_comment}\n{code}")
+            spec_structured[qualname] = code
+
             func_class[qualname] = class_name
             func_header[qualname] = header
         
@@ -276,12 +279,12 @@ class Extractor:
             for (file_path, line_no, _) in [builtins._dbg_storage["fn_locs"][qualname]]
         }
 
-        return spec_code_str, path[-depth:], loc_dict
+        return spec_structured, path[-depth:], loc_dict
 
 def extract_code(eval_file: Path, args: list, depth=-1) -> str:
     extractor = Extractor()
-    spec_code_str, path, loc_dict = extractor.run(eval_file, args, depth=depth)
-    return spec_code_str, path, loc_dict
+    spec_structured, path, loc_dict = extractor.run(eval_file, args, depth=depth)
+    return spec_structured, path, loc_dict
 
 def add_decorators(loc_dict, decorator="@funsearch.hotswap"):
     """
@@ -358,9 +361,9 @@ if __name__ == "__main__":
     parser.add_argument("--args", nargs="*", help="arguments to pass to file")
     args = parser.parse_args()
 
-    spec_code_str, path, loc_dict = extract_code(Path(args.file), args.args)
+    spec_structured, path, loc_dict = extract_code(Path(args.file), args.args)
 
-    print(loc_dict)
+    print(spec_structured)
 
     add_decorators(loc_dict)
     remove_decorators(loc_dict)
