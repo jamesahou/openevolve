@@ -280,7 +280,7 @@ class Island:
     implementations: Sequence[code_manipulation_2.Program]) -> str:
     
     implementations = copy.deepcopy(implementations)
-    prompt = f"{self._file_hierarchy}\n\n"
+    prompt = f"# File Hierarchy \n{self._file_hierarchy}\n\n"
     for program_version, implementation in enumerate(implementations):
       prompt += f"# Start of Program  Version {program_version} (*_v{program_version})\n"
       if program_version >= 1:

@@ -54,6 +54,8 @@ def _is_in_base_dir(base_dir: Path, file_path_str: str) -> bool:
     except ValueError:
         return False
 
+# --- changes throughout Extractor and related functions to use fullname as the primary identifier ---
+
 class Extractor:
     def __init__(self):
         self.script_path: Path = None
@@ -76,7 +78,7 @@ class Extractor:
                     queue.append((neighbor, path + [neighbor]))
 
         return None
-    
+
     def extract_function_code(self, file_path, qualname):
         """
         Extract the code and header for the function/method with the given qualname.
@@ -169,12 +171,14 @@ class Extractor:
             if _is_in_base_dir(self.base_dir, caller_file):
                 caller_name = caller_code.co_name
                 qualname = getattr(caller_code, "co_qualname", caller_name)
-                builtins._dbg_storage['fn_locs'][qualname] = (caller_file, caller_code.co_firstlineno, qualname)
+                fullname = f"{caller_file} {qualname}"
+                builtins._dbg_storage['fn_locs'][fullname] = (caller_file, caller_code.co_firstlineno, qualname)
 
             if _is_in_base_dir(self.base_dir, callee_file):
                 callee_name = code.co_name
                 qualname = getattr(code, "co_qualname", callee_name)
-                builtins._dbg_storage['fn_locs'][qualname] = (callee_file, code.co_firstlineno, qualname)
+                fullname = f"{callee_file} {qualname}"
+                builtins._dbg_storage['fn_locs'][fullname] = (callee_file, code.co_firstlineno, qualname)
 
             # Only process calls where either caller or callee is in our base directory
             if not (_is_in_base_dir(self.base_dir, caller_file) or
@@ -185,7 +189,9 @@ class Extractor:
             if _is_in_base_dir(self.base_dir, caller_file) and _is_in_base_dir(self.base_dir, callee_file):
                 caller_qualname = getattr(caller_code, "co_qualname", caller_code.co_name)
                 callee_qualname = getattr(code, "co_qualname", code.co_name)
-                builtins._dbg_storage['call_graph'].setdefault(caller_qualname, set()).add(callee_qualname)
+                caller_fullname = f"{caller_file} {caller_qualname}"
+                callee_fullname = f"{callee_file} {callee_qualname}"
+                builtins._dbg_storage['call_graph'].setdefault(caller_fullname, set()).add(callee_fullname)
 
         elif event == "return":
             if code in builtins._dbg_storage['run_codeobjs'] and self.watch_stack_depth > 0:
@@ -222,18 +228,19 @@ class Extractor:
             sys.settrace(None)
             sys.argv = original_argv
 
-        opt_qualnames = {getattr(fn.__code__, "co_qualname", fn.__name__) for fn in builtins._dbg_storage['fns_to_evolve']}
-        watch_qualnames = {getattr(fn.__code__, "co_qualname", fn.__name__) for fn in builtins._dbg_storage['fns_to_run']}
-        print("Evolving functions: ", opt_qualnames)
-        print("Running functions: ", watch_qualnames)
+        # Use fullname as the identifier
+        opt_fullnames = {f"{getattr(fn.__code__, 'co_filename', file)} {getattr(fn.__code__, 'co_qualname', fn.__name__)}" for fn in builtins._dbg_storage['fns_to_evolve']}
+        watch_fullnames = {f"{getattr(fn.__code__, 'co_filename', file)} {getattr(fn.__code__, 'co_qualname', fn.__name__)}" for fn in builtins._dbg_storage['fns_to_run']}
+        print("Evolving functions: ", opt_fullnames)
+        print("Running functions: ", watch_fullnames)
 
         # Only get the first valid path
         path = None
-        for opt_qualname in opt_qualnames:
-            for watch_qualname in watch_qualnames:
-                candidate_path = self.find_path(watch_qualname, opt_qualname)
+        for opt_fullname in opt_fullnames:
+            for watch_fullname in watch_fullnames:
+                candidate_path = self.find_path(watch_fullname, opt_fullname)
                 if candidate_path:
-                    print(f"Path from {watch_qualname} to {opt_qualname}: {candidate_path}")
+                    print(f"Path from {watch_fullname} to {opt_fullname}: {candidate_path}")
                     path = candidate_path
                     break
             if path:
@@ -248,8 +255,8 @@ class Extractor:
         spec_code = []
         spec_structured = []
         # Extract the code in the order of the path
-        for qualname in path[-depth:]:
-            file_path, line_no, _ = builtins._dbg_storage["fn_locs"][qualname]
+        for fullname in path[-depth:]:
+            file_path, line_no, qualname = builtins._dbg_storage["fn_locs"][fullname]
             code, class_name, header = self.extract_function_code(self.base_dir / file_path, qualname)
             location_comment = f"# Location: {file_path}:{line_no}"
             if class_name:
@@ -258,15 +265,15 @@ class Extractor:
             
             spec_structured.append(FunctionImplementation(filepath=file_path, qualname=qualname, code=code))
 
-            func_class[qualname] = class_name
-            func_header[qualname] = header
+            func_class[fullname] = class_name
+            func_header[fullname] = header
         
         spec_structured = ProgramImplementation(
             functions=spec_structured)
 
         # Write the code to a file
         spec_code_str = "\n\n".join(spec_code)
-        spec_code_str = f"# Minimal code path from {watch_qualnames} to {opt_qualnames}\n\n{spec_code_str}"
+        spec_code_str = f"# Minimal code path from {watch_fullnames} to {opt_fullnames}\n\n{spec_code_str}"
         spec_code_path = str(self.script_path)[:-3] + "_spec.py"
 
         with open(spec_code_path, 'w') as f:
@@ -274,15 +281,15 @@ class Extractor:
 
         # Get location of functions on path, now also include header
         loc_dict = {
-            qualname: {
+            fullname: {
                 "file_path": file_path,
                 "line_no": line_no,
-                "class": func_class.get(qualname, None),
-                "header": func_header.get(qualname, None),
-                "qualname": qualname
+                "class": func_class.get(fullname, None),
+                "header": func_header.get(fullname, None),
+                "qualname": qualname,
             }
-            for qualname in path[-depth:]
-            for (file_path, line_no, _) in [builtins._dbg_storage["fn_locs"][qualname]]
+            for fullname in path[-depth:]
+            for (file_path, line_no, qualname) in [builtins._dbg_storage["fn_locs"][fullname]]
         }
         
         return spec_structured, path[-depth:], loc_dict
@@ -298,7 +305,7 @@ def add_decorators(loc_dict, decorator="@funsearch.hotswap"):
     Import funsearch at the top of the file.
     """
     
-    for fn_name, loc in loc_dict.items():
+    for fullname, loc in loc_dict.items():
         file_path = Path(loc["file_path"])
         if not file_path.exists():
             continue
@@ -337,7 +344,7 @@ def remove_decorators(loc_dict, decorator="@funsearch.hotswap"):
     Edit the original file to remove the specified decorator from the functions.
     """
     
-    for fn_name, loc in loc_dict.items():
+    for fullname, loc in loc_dict.items():
         file_path = Path(loc["file_path"])
         if not file_path.exists():
             continue
