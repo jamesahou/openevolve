@@ -67,24 +67,40 @@ class AsyncEvaluator:
     def __init__(
         self,
         database: programs_database_2.ProgramsDatabase,
-        sbox: sandbox.DummySandbox,
+        sandbox: sandbox.ContainerSandbox,
         template: code_manipulation.Program,
         workspace: pathlib.Path,
         eval_file: pathlib.Path,
         imps_path: pathlib.Path,
         program_meta: dict[FullName, FuncMeta],
-        test_cases: Sequence[TestCase],
-        timeout_seconds: int = 30,
+        tests: list[TestCase],
+        timeout: float = 30.0,
     ):
+        """
+        Initializes the evaluator with the necessary components.
+
+        Args:
+            database (ProgramsDatabase): The database to store results.
+            sbox (DummySandbox): The sandbox for running implementations.
+            template (Program): The template program to use.
+            workspace (Path): The workspace directory for saving implementations.
+            eval_file (Path): The entropy point of the evaluator.
+            imps_path (Path): Path where implementations are saved.
+            program_meta (dict[FullName, FuncMeta]): Metadata for the program functions.
+            tests (list[TestCase]): Test cases to run against the implementations.
+            timeout (float): Timeout for each test case execution in seconds.
+        """
         self._database = database
         self._template = template
-        self._test_cases = test_cases
-        self._timeout_seconds = timeout_seconds
-        self._sandbox = sbox
+        self._tests = tests
+        self._timeout = timeout
+        self._sandbox = sandbox
         self._eval_file = eval_file
         self._imps_path = imps_path
         self._program_meta = program_meta
         self._workspace = workspace
+
+        sandbox.upload_test_cases(tests)
 
     async def analyse(
         self,
@@ -98,17 +114,19 @@ class AsyncEvaluator:
         # Evaluate on the test cases and get the test scores
         test_scores = {}
 
-        for test_case in self._test_cases:
+        for test_id in range(len(self._tests)):
             test_output, runs_ok = self._sandbox.run(
-                # TODO: What do we want to pass here?
-                program, self._eval_file, test_case, self._timeout_seconds, implementation_id
+                entry_point = self._eval_file,
+                implementation_id = implementation_id,
+                test_id = test_id,
+                timeout = self._timeout,
             )
 
             if runs_ok and test_output is not None:
                 if not isinstance(test_output, (int, float)):
                     raise ValueError("@run did not return an int/float score.")
-                    
-                test_scores[test_case] = test_output
+
+                test_scores[self._tests[test_id]] = test_output
 
         if test_scores:
             self._database.register_program(program, island_id, test_scores)
