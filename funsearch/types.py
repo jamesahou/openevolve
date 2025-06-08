@@ -1,4 +1,4 @@
 from typing import TypeAlias
 
-# An annotation for full names (filepath + space + qualname)
+# An annotation for full names (abspath + space + qualname)
 FullName: TypeAlias = str
