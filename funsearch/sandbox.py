@@ -1,5 +1,7 @@
 from funsearch.test_case import TestCase
 
+from enum import StrEnum
+
 import logging
 
 import ast
@@ -18,7 +20,8 @@ IMAGE_NAME = "funsearch_sandbox"
 
 
 class DummySandbox:
-    """Base class for Sandboxes that execute the generated code.
+    """
+    Base class for Sandboxes that execute the generated code.
 
     Note: this base class executes the code but does not offer any sandboxing!!!
     It should be only used in unit testing or debugging, and not with real LLM
@@ -41,8 +44,8 @@ class DummySandbox:
         self,
         code: str,
         function_name: str,
-        # timeout_seconds: int,
-        inputs: TestCase,
+        test_case: TestCase,
+        timeout: float = 30.0,
     ) -> tuple[Any, bool]:
         """
         Executes a specified function from dynamically compiled code with given arguments.
@@ -50,7 +53,8 @@ class DummySandbox:
         Args:
             code (str): The source code containing the function to execute.
             function_name (str): The name of the function to invoke from the compiled code.
-            inputs (TestCase): The test case containing input arguments and keyword arguments.
+            test_case (TestCase): The test case containing input arguments and keyword arguments.
+            timeout (float): The maximum time in seconds to allow for the function execution.
 
         Returns:
             tuple[Any, bool]: The result of the function execution and a boolean flag indicating success.
@@ -63,8 +67,8 @@ class DummySandbox:
         # The same "program" seems to be now repeatedly parsed using AST and then compiled.
         # This could probably be simplified quite a bit.
         namespace = DummySandbox.compile(code)
-        args = inputs.args
-        kwargs = inputs.kwargs
+        args = test_case.args
+        kwargs = test_case.kwargs
         return namespace[function_name](*args, **kwargs)
 
     @staticmethod
@@ -88,7 +92,8 @@ class DummySandbox:
 ### TODO: EVERYTHING BELOW THIS
 
 class ExternalProcessSandbox(DummySandbox):
-    """Sandbox that executes the code in a separate Python process in the same host.
+    """
+    Sandbox that executes the code in a separate Python process in the same host.
 
     Note: This does not provide real safety and should be only used in an environment where the host process is
     in some kind of safe sandbox itself (i.e., a container).
@@ -99,14 +104,14 @@ class ExternalProcessSandbox(DummySandbox):
     def __init__(
         self,
         base_path: pathlib.Path,
-        timeout_secs: int = 30,
         python_path: str = "python",
+        timeout: float = 30.0,
     ):
-        super(ExternalProcessSandbox, self).__init__()
+        super().__init__()
 
         self.output_path = pathlib.Path(base_path) / f"sandbox{self.id}"
-        self.timeout_secs = timeout_secs
         self.python_path = python_path
+        self.timeout = timeout
         self.call_count = 0
 
         self.input_path = self.output_path / "inputs"
@@ -186,30 +191,56 @@ class ExternalProcessSandbox(DummySandbox):
             f.write(program)
 
 
+class ContainerEngine(StrEnum):
+    """Enum for container engines."""
+    PODMAN = "podman"
+    DOCKER = "docker"
+
+DEFAULT_CONTAINER_ENGINE = ContainerEngine.PODMAN
+
 class ContainerSandbox(ExternalProcessSandbox):
-    """Basic sandbox that runs unsafe code in Podman or Docker container.
+    """
+    Basic sandbox that runs unsafe code in Podman or Docker container.
     - the sandbox should be safe against inadvertent bad code by LLM but not against malicious attacks.
     - does not require any other dependencies on the host than Podman/Docker
     - does not support multithreading
     - might provide easier or more lightweight debugging experience than some other fancier sandbox environments
     """
-
-    executable = "podman"
+    engine: ContainerEngine = DEFAULT_CONTAINER_ENGINE
     image_built = False
 
     @classmethod
+    def has_engine(cls, engine: ContainerEngine) -> bool:
+        """Checks if the specified container engine is available."""
+        ret = os.system(f"{engine.value} --version")
+        return ret == 0
+
+    @classmethod
+    def use_engine(cls, engine: ContainerEngine):
+        """Sets the container engine to the specified one."""
+        cls.engine = engine
+
+    @classmethod
     def build_image(cls, extra_pip_packages):
+        """Builds the container image."""
         version = sys.version.split(" ")[0]
-        ret = os.system("podman --version")
-        if ret != 0:
-            ret = os.system("docker --version")
-            if ret != 0:
+        logging.debug(f"Using Python version: {version}")
+
+        # Select which container engine to use
+        logging.debug("Checking for Podman...")
+
+        if not cls.has_engine(ContainerEngine.PODMAN):
+            logging.debug("Podman not found, checking for Docker...")
+
+            if cls.has_engine(ContainerEngine.DOCKER):
+                logging.debug("Docker found, using it instead of Podman.")
+                cls.use_engine(ContainerEngine.DOCKER)
+            else:
                 raise Exception(
                     "Could not find Podman or Docker. Can not use ContainerSandbox."
                 )
-            else:
-                cls.executable = "docker"
 
+        # Build the container image
         dockerfile = pathlib.Path(__file__).parent / "container" / "Dockerfile"
         logging.debug("Building container image")
         extra = ""
@@ -217,20 +248,27 @@ class ContainerSandbox(ExternalProcessSandbox):
             extra = f'--build-arg INSTALL_PACKAGES="{extra_pip_packages}"'
 
         cmd = (
-            f"{cls.executable} build --build-arg PYTHON_VERSION={version} {extra} "
+            f"{cls.engine} build --build-arg PYTHON_VERSION={version} {extra} "
             f"-t {IMAGE_NAME} -f {dockerfile} {CONTAINER_MAIN.parent}"
         )
         logging.debug(f"Executing: {cmd}")
         os.system(cmd)
+
+        # TODO: Add the decorators to the relevant functions in the project directory
+        logging.debug("Adding decorators to the project directory.")
+
+        # Complete the image build process
+        logging.debug("Container image built successfully.")
         cls.image_built = True
 
     def __init__(
         self,
         base_path: pathlib.Path,
+        python_path: str = "python",
         extra_pip_packages: str = "numpy",
-        timeout_secs=30,
+        timeout: float = 30.0,
     ):
-        super(ContainerSandbox, self).__init__(base_path, timeout_secs)
+        super().__init__(base_path, python_path, timeout)
 
         if not ContainerSandbox.image_built:
             ContainerSandbox.build_image(extra_pip_packages)
@@ -241,7 +279,8 @@ class ContainerSandbox(ExternalProcessSandbox):
         input_path: pathlib.Path,
         error_file_path: pathlib.Path,
     ):
-        """Use podman/docker to execute python in a container.
+        """
+        Use podman/docker to execute python in a container.
         - The main.py shall execute the LLM generated method from prog.pickle file providing
           input.pickle as the input for the method.
         - main.py writes the output of the method into output.pickle.
