@@ -13,12 +13,10 @@ import sys
 import ast
 import os
 
-CONTAINER_MAIN = (
-    pathlib.Path(__file__).parent / "container" / "main.py"
-).absolute()
+CONTAINER_MAIN = "/main.py"
 
 IMAGE_NAME = "funsearch_sandbox"
-
+CONTAINER_NAME = "funsearch_container"
 
 class DummySandbox:
     """
@@ -93,7 +91,7 @@ class ContainerEngine(StrEnum):
     PODMAN = "podman"
     DOCKER = "docker"
 
-DEFAULT_CONTAINER_ENGINE = ContainerEngine.PODMAN
+DEFAULT_CONTAINER_ENGINE = ContainerEngine.DOCKER
 
 class ContainerSandbox(DummySandbox):
     """
@@ -117,10 +115,11 @@ class ContainerSandbox(DummySandbox):
         """Sets the container engine to the specified one."""
         cls.engine = engine
 
+    @classmethod
     @property
-    def executable(self) -> str:
+    def executable(cls) -> str:
         """Returns the executable command for the container engine."""
-        return self.engine.value
+        return cls.engine.value
 
     @classmethod
     def select_engine(cls):
@@ -157,6 +156,9 @@ class ContainerSandbox(DummySandbox):
         if setup_file is not None:
             extra = f'--build-arg SETUP_FILE="{setup_file}"'
 
+        # Set the build context to the root directory of the OpenEvolve project
+        build_context = dockerfile.parent.parent.parent
+
         # Prepare the command to build the container image
         cmd = (
             # Use the container engine to build the image
@@ -167,17 +169,33 @@ class ContainerSandbox(DummySandbox):
             f"--build-arg WORKSPACE_ROOT={workspace_path} "
             # Set the build argument for the evaluation entry point
             f"--build-arg EVAL_FILE={eval_file} "
-            # Mount the implementations path from the host to /implementations in the container
-            f"-v {implementations_path}:/implementations:ro "
             # Tag the image with the name
             f"-t {IMAGE_NAME} "
             # Use the Dockerfile from the container directory
-            f"-f {dockerfile} {CONTAINER_MAIN.parent} "
+            f"-f {dockerfile} {build_context} "
             # Add any extra build arguments, such as the setup file
             f"{extra}"
         )
 
         # Execute the command to build the image
+        logging.debug(f"Executing: {cmd}")
+        os.system(cmd)
+
+        # Create the container
+        logging.debug("Creating container from the built image...")
+        
+        cmd = (
+            f"{cls.executable} create "
+            # Set the container to run in interactive mode
+            f"-i "
+            # Set the container name
+            f"--name {CONTAINER_NAME} "
+            # Mount the implementations directory from the host to /implementations in the container
+            f"--mount type=bind,source={implementations_path},target=/implementations,readonly "
+            # Use the built image
+            f"{IMAGE_NAME}:latest"
+        )
+
         logging.debug(f"Executing: {cmd}")
         os.system(cmd)
 
@@ -214,8 +232,8 @@ class ContainerSandbox(DummySandbox):
 
             # Use the container engine to copy files to the container
             cmd = (
-                f"{cls.executable} cp {temp_dir}:/inputs "
-                f"{IMAGE_NAME}:latest"
+                f"{cls.executable} cp {temp_dir}/. "
+                f"{CONTAINER_NAME}:/inputs"
             )
 
             logging.debug(f"Copying test cases to container: {cmd}")
@@ -265,11 +283,29 @@ class ContainerSandbox(DummySandbox):
                 f"eval_file must be a Python file, got {eval_file.suffix}"
             )
 
+        """
         # Build the container image if it has not been built yet
         if ContainerSandbox.built:
             logging.warning("Container image already built! Skipping build.")
         else:
             ContainerSandbox.build_image(workspace_path, implementations_path, eval_file, setup_file)
+        """
+
+        ContainerSandbox.start_container()
+
+    @classmethod
+    def start_container(cls):
+        """
+        Starts the container if it is not already running.
+        If the container is already running, it will not do anything.
+        """
+        cmd = (
+            f"{cls.executable} start "
+            f"{CONTAINER_NAME}"
+        )
+
+        logging.debug(f"Executing: {cmd}")
+        os.system(cmd)
 
     def execute(
         self,
@@ -287,25 +323,26 @@ class ContainerSandbox(DummySandbox):
         """
         cmd = (
             # Use the container engine to run the command
-            f"{self.executable} run "
-            # Set the execution timeout
-            f"--stop-timeout={timeout} "
+            f"{self.executable} exec "
             # Set the container to run on
-            f"{IMAGE_NAME}:latest "
+            f"{CONTAINER_NAME} "
+            f"/bin/bash -c '"
             # Set the environment variable for hot-swapping
-            f"-e {HOTSWAP_ENVVAR}={implementation_id} "
+            f"{HOTSWAP_ENVVAR}={implementation_id} "
             # Call the Python interpreter in the container
             f"{self.python_path} "
             # Execute the main Python script in the container
             f"{CONTAINER_MAIN} "
-            # Pass the paths to the eval program, input, and output files
-            f"eval.py "
+            # Pass the paths to the eval program, input file, output file, and log directory
+            f"/eval.py "
             f"/inputs/{test_id}.pickle "
             f"/outputs/{implementation_id}/output_{test_id}.pickle "
+            # Pass the timeout to the main script
+            f"{timeout} "
             # Pipe the standard output to a log file
-            f"> /logs/{implementation_id}/test_{test_id}/stdout.txt "
+            f"> /logs/{implementation_id}_test_{test_id}_stdout.txt "
             # Pipe the standard error output to a log file
-            f"2> /logs/{implementation_id}/test_{test_id}/stderr.txt "
+            f"2> /logs/{implementation_id}_test_{test_id}_stderr.txt' "
         )
         logging.debug(f"Executing: {cmd}")
         return os.system(cmd)
@@ -335,7 +372,7 @@ class ContainerSandbox(DummySandbox):
         # Copy the output file from the container to the host
         cmd = (
             f"{self.executable} cp "
-            f"{IMAGE_NAME}:latest:/outputs/{implementation_id}/output_{test_id}.pickle "
+            f"{CONTAINER_NAME}:/outputs/{implementation_id}/output_{test_id}.pickle "
             f"{output_file.name}"
         )
         logging.debug(f"Copying output file from container: {cmd}")
@@ -349,3 +386,66 @@ class ContainerSandbox(DummySandbox):
         os.remove(output_file.name)
 
         return output_data
+
+def main(workspace_root, implementations_root):
+    ImplementationsManager.set_workspace_root(workspace_root)
+    ImplementationsManager.set_implementations_root(implementations_root)
+    ImplementationsManager.set_program_meta(program_meta)
+
+    implementation_manager = ImplementationsManager()
+    implementation_manager.save_implementation(initial_program, "random")
+
+    # Example usage of the ContainerSandbox
+    sandbox = ContainerSandbox(
+        workspace_path=pathlib.Path("./astropy"),
+        eval_file=pathlib.Path("./astropy/eval.py"),
+        implementations_path=implementations_root,
+        setup_file=pathlib.Path("./examples/astropy_example/setup.sh")
+    )
+
+    sandbox.upload_test_cases(test_cases)
+
+    sandbox.execute("random", 0)
+
+if __name__ == "__main__":
+    # Set log level to DEBUG for detailed output
+    logging.basicConfig(level=logging.DEBUG)
+
+    import funsearch.extractor as extractor
+    from funsearch.evaluator2 import ImplementationsManager
+    from pathlib import Path
+
+    workspace_root = Path("/Users/ryanrudes/openevolve/astropy")
+    implementations_root = pathlib.Path("/Users/ryanrudes/openevolve/implementations")
+
+    test_cases = [
+        TestCase(args=[], kwargs={}),
+        TestCase(args=[], kwargs={}),
+    ]
+
+    """
+    initial_program, evolve_path, program_meta = extractor.extract_code(Path("/Users/ryanrudes/openevolve/astropy/eval.py"), test_cases)
+
+    with open("initial_program.pickle", "wb") as f:
+        pickle.dump(initial_program, f)
+
+    with open("program_meta.pickle", "wb") as f:
+        pickle.dump(program_meta, f)
+
+    exit()
+    """
+
+    with open("initial_program.pickle", "rb") as f:
+        initial_program = pickle.load(f)
+
+    with open("program_meta.pickle", "rb") as f:
+        program_meta = pickle.load(f)
+
+    extractor.add_decorators(program_meta)
+
+    try:
+        main(workspace_root, implementations_root)
+    except:
+        pass
+    finally:
+        extractor.remove_decorators(program_meta)

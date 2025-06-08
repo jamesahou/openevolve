@@ -13,7 +13,7 @@ PROJECT_ROOT = "workspace/"
 def get_relative_path(func: FunctionType, root: str) -> str:
     """Get the file path of the provided function relative to the project root."""
     absolute_path = inspect.getfile(func)
-    relative_path = absolute_path.split(root, 1)[-1].lstrip('/')
+    relative_path = absolute_path.rsplit(root, 1)[-1].lstrip('/')
     return relative_path
 
 def get_implementation(func: FunctionType) -> Optional[str]:
@@ -24,7 +24,7 @@ def get_implementation(func: FunctionType) -> Optional[str]:
     if procname == "-1":
         return None
     imp_name = qualname + " " + procname
-    imp_path = os.path.join(IMPLEMENTATIONS_ROOT, PROJECT_ROOT, filepath, imp_name)
+    imp_path = os.path.join(IMPLEMENTATIONS_ROOT, filepath, imp_name)
     try:
         return open(imp_path, 'r').read() 
     except FileNotFoundError:

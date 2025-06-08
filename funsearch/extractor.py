@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from typing import Callable
 import types
-from IPython import embed
 import os
 from collections import deque
 import ast
@@ -300,7 +299,7 @@ def extract_code(eval_file: Path, args: list, depth=-1):
     spec_structured, path, program_meta = extractor.run(eval_file, args[0].args, depth=depth)
     return spec_structured, path, program_meta
 
-def add_decorators(program_meta: List[FuncMeta], decorator="@funsearch.hotswap"):
+def add_decorators(program_meta: dict[FullName, FuncMeta], decorator="@funsearch.hotswap"):
     """
     Edit the original file to add the specified decorator to the functions.
     Import funsearch at the top of the file.

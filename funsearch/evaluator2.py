@@ -25,11 +25,44 @@ import os
 class ImplementationsManager:
     """Class that manages implementations of programs."""
 
+    # Directory where the workspace is located
+    workspace_root: pathlib.Path
+
     # Directory where implementations are saved
     implementations_root: pathlib.Path
 
     # This is a mapping from function full names to their metadata
     program_meta: dict[FullName, FuncMeta]
+
+    @classmethod
+    def set_workspace_root(cls, root: pathlib.Path):
+        """
+        Sets the root directory for the workspace.
+        
+        Args:
+            root (Path): The root directory where the workspace will be located.
+        """
+        cls.workspace_root = root
+
+    @classmethod
+    def set_implementations_root(cls, root: pathlib.Path):
+        """
+        Sets the root directory for implementations.
+        
+        Args:
+            root (Path): The root directory where implementations will be saved.
+        """
+        cls.implementations_root = root
+    
+    @classmethod
+    def set_program_meta(cls, program_meta: dict[FullName, FuncMeta]):
+        """
+        Sets the metadata for the program functions.
+        
+        Args:
+            program_meta (dict[FullName, FuncMeta]): Metadata for the program functions.
+        """
+        cls.program_meta = program_meta
     
     @classmethod
     def _save_function(cls, function: Function, id: str):
@@ -40,7 +73,8 @@ class ImplementationsManager:
             function (Function): The function to save.
             id (str): The unique identifier for the implementation.
         """
-        func_file_path = cls.implementations_root / function.path
+        rel_func_path = os.path.relpath(function.path, cls.workspace_root)
+        func_file_path = cls.implementations_root / rel_func_path
         func_code_path = func_file_path / (function.qualname + ' ' + id)
 
         os.makedirs(func_file_path, exist_ok=True)
