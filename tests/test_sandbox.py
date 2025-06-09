@@ -10,6 +10,8 @@ import pytest
 import types
 import os
 
+os.environ["PATH"] = "/opt/homebrew/bin/:" + os.environ["PATH"]
+
 @pytest.fixture(autouse=True)
 def reset_sandbox_id():
     DummySandbox.sandboxes = 0

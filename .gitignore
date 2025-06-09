@@ -23,5 +23,5 @@ share/python-wheels/
 *.egg
 MANIFEST
 .env
-
-examples/astropy_example/repo/*
+.vscode
+.venv

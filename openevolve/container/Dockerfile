@@ -42,14 +42,17 @@ COPY ${EVAL_RELPATH} /eval.py
 RUN apt-get update && \
     apt-get install -y git
 
+    # Upgrade pip to the latest version
+RUN pip install --upgrade pip
+
 # Clone the main entry point gist
 RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /openevolve_gists
 RUN mv /openevolve_gists/openevolve_sandbox_main.py /main.py
 RUN rm -rf /openevolve_gists
 
-# This is temporary and should later be replaced with a git clone of the openevolve repository
 COPY ./openevolve /openevolve
 
+# Install OpenEvolve
 RUN cd /openevolve && \
     pip install -e .
 

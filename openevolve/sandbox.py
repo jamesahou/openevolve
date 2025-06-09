@@ -203,7 +203,7 @@ class ContainerSandbox(DummySandbox):
             # Set the build argument for the Python version
             f"--build-arg PYTHON_VERSION={version} "
             # Set the build argument for the workspace root
-            f"--build-arg PROJECT_ROOT={project_root} "
+            f"--build-arg PROJECT_ROOT=. "
             # Set the build argument for the evaluation entry point
             f"--build-arg EVAL_RELPATH={eval_relpath} "
             # Tag the image with the name
@@ -216,7 +216,13 @@ class ContainerSandbox(DummySandbox):
 
         # Execute the command to build the image
         logging.debug(f"Executing: {cmd}")
-        os.system(cmd)
+        ret = os.system(cmd)
+
+        if ret != 0:
+            raise RuntimeError(
+                f"Failed to build the container image {SANDBOX_IMAGE_NAME}. "
+                "Please check the Dockerfile and the build context."
+            )
 
     @classmethod
     def create_container(cls, imps_root: HostAbsPath):
