@@ -2,22 +2,16 @@
 from openevolve.code_manipulation import (
     Function,
     Program,
-    header_from_str,
-    structured_output_to_functions,
     structured_output_to_prog_meta
 )
 
-from openevolve.custom_types import FullName, FuncMeta
+from openevolve.custom_types import FullName, FuncMeta, HostAbsPath
 
-from openevolve import code_manipulation
 from openevolve import programs_database
 from openevolve import sandbox
 
 from openevolve.structured_outputs import ProgramImplementation
 from openevolve.test_case import TestCase
-
-from typing import Any, Dict
-from collections.abc import Sequence
 
 import pathlib
 import os
@@ -26,31 +20,31 @@ class ImplementationsManager:
     """Class that manages implementations of programs."""
 
     # Directory where the workspace is located
-    workspace_root: pathlib.Path
+    workspace_root: HostAbsPath
 
     # Directory where implementations are saved
-    implementations_root: pathlib.Path
+    implementations_root: HostAbsPath
 
     # This is a mapping from function full names to their metadata
     program_meta: dict[FullName, FuncMeta]
 
     @classmethod
-    def set_workspace_root(cls, root: pathlib.Path):
+    def set_workspace_root(cls, root: HostAbsPath):
         """
         Sets the root directory for the workspace.
         
         Args:
-            root (Path): The root directory where the workspace will be located.
+            root (HostAbsPath): The root directory where the workspace will be located on the host.
         """
         cls.workspace_root = root
 
     @classmethod
-    def set_implementations_root(cls, root: pathlib.Path):
+    def set_implementations_root(cls, root: HostAbsPath):
         """
         Sets the root directory for implementations.
         
         Args:
-            root (Path): The root directory where implementations will be saved.
+            root (HostAbsPath): The root directory where implementations will be saved on the host.
         """
         cls.implementations_root = root
     
@@ -83,8 +77,7 @@ class ImplementationsManager:
 
     @classmethod
     def save_implementation(cls, implementation: ProgramImplementation, id: str) -> Program:
-        """Saves the implementation in the specified directory."""
-        """Given sampler code in structured format, saves it in the implementation dir by current ID. Save in form accessible to decorator"""
+        """Saves the implementation to the filesystem and returns a Program object."""
         parsed_prog = structured_output_to_prog_meta(implementation, cls.program_meta)
 
         for function in parsed_prog.functions:
