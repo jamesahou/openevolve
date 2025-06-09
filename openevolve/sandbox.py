@@ -249,7 +249,13 @@ class ContainerSandbox(DummySandbox):
         )
 
         logging.debug(f"Executing: {cmd}")
-        os.system(cmd)
+        retcode = os.system(cmd)
+
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to create the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine and the image."
+            )
 
         # Complete the image build process
         logging.debug("Container image built successfully.")
