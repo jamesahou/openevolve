@@ -20,7 +20,7 @@ def reset_sandbox_id():
 
 def test_builds_image():
     # Get the path to the project root
-    project_root: HostAbsPath = Path("/Users/ryanrudes/openevolve/astropy")
+    project_root: HostAbsPath = Path("/Users/ryanrudes/GitHub/OpenEvolve/astropy")
 
     # Get the relative path to the evaluation script
     eval_path: HostRelPath = Path("./eval.py")
@@ -35,7 +35,10 @@ def test_builds_image():
     )
 
 def test_creates_sandbox():
-    # # Create temporary directory to store implementations
-    # imps_dir = tempfile.TemporaryDirectory()
-    # imps_path: HostAbsPath = Path(imps_dir.name)
-    raise NotImplementedError("This test is not implemented yet.")
+    # Create temporary directory to store implementations
+    imps_root: HostAbsPath = Path("/Users/ryanrudes/GitHub/OpenEvolve/openevolve/imps")
+
+    ContainerSandbox.create_container(imps_root)
+
+def test_starts_sandbox():
+    ContainerSandbox.start_container()

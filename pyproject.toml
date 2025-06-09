@@ -10,7 +10,7 @@ name = "openevolve"
 dynamic = [
   "version",
 ]
-description = "FunSearch algorithm: Mathematical discoveries from program search with large language models"
+description = "OpenEvolve: Codebase-scale evolutionary algorithms for code optimization, powered by LLMs"
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -32,3 +32,8 @@ dependencies = [
 
 [project.scripts]
 openevolve = "openevolve.__main__:main"
+
+[tool.pytest.ini_options]
+addopts = "-ra --tb=short"
+testpaths = ["tests", "examples"]
+python_files = ["test_*.py", "*_test.py"]

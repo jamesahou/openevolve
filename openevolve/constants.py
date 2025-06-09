@@ -5,14 +5,14 @@ from pathlib import Path
 HOTSWAP_ENVVAR = "OPENEVOLE_HOTSWAP_IMP"
 
 # Absolute paths in the container file system
-WORKSPACE_ROOT: ContainerAbsPath = Path("/workspace")
-CONTAINER_IMPS_PATH: ContainerAbsPath = Path("/imps")
-CONTAINER_LOGS_PATH: ContainerAbsPath = Path("/logs")
-CONTAINER_INPUTS_PATH: ContainerAbsPath = Path("/inputs")
-CONTAINER_OUTPUTS_PATH: ContainerAbsPath = Path("/outputs")
-CONTAINER_EVAL_PATH: ContainerAbsPath = Path("/eval.py")
-CONTAINER_SETUP_PATH: ContainerAbsPath = Path("/setup.sh")
-CONTAINER_MAIN_PATH: ContainerAbsPath = Path("/main.py")
+WORKSPACE_ROOT: ContainerAbsPath = Path("/home/workspace")
+CONTAINER_IMPS_PATH: ContainerAbsPath = Path("/home/imps")
+CONTAINER_LOGS_PATH: ContainerAbsPath = Path("/home/logs")
+CONTAINER_INPUTS_PATH: ContainerAbsPath = Path("/home/inputs")
+CONTAINER_OUTPUTS_PATH: ContainerAbsPath = Path("/home/outputs")
+CONTAINER_EVAL_PATH: ContainerAbsPath = Path("/home/eval.py")
+CONTAINER_SETUP_PATH: ContainerAbsPath = Path("/home/setup.sh")
+CONTAINER_MAIN_PATH: ContainerAbsPath = Path("/home/main.py")
 CONTAINER_PYTHONPATH: ContainerAbsPath = Path("/usr/local/bin/python3")
 
 # Container constants

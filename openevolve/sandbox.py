@@ -9,6 +9,7 @@ from openevolve.constants import (
     CONTAINER_LOGS_PATH,
     CONTAINER_INPUTS_PATH,
     CONTAINER_OUTPUTS_PATH,
+    CONTAINER_IMPS_PATH,
     CONTAINER_PYTHONPATH,
 )
 
@@ -242,7 +243,7 @@ class ContainerSandbox(DummySandbox):
             # Set the container name
             f"--name {SANDBOX_CONTAINER_NAME} "
             # Mount the implementations directory from the host to /implementations in the container
-            f"--mount type=bind,source={imps_root},target=/imps,readonly "
+            f"--mount type=bind,source={imps_root},target={CONTAINER_IMPS_PATH},readonly "
             # Use the built image
             f"{SANDBOX_IMAGE_NAME}:latest"
         )
