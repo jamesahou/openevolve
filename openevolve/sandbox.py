@@ -343,7 +343,7 @@ class ContainerSandbox(DummySandbox):
         implementation_id: str,
         test_id: int,
         timeout: float = 30.0,
-    ) -> tuple[Path, int]:
+    ) -> tuple[ContainerAbsPath, int]:
         """
         Use podman/docker to execute python in a container.
         - The main.py shall execute the LLM generated method from prog.pickle file providing
