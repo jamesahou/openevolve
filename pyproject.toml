@@ -3,10 +3,10 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["funsearch", "funsearch.container"]
+packages = ["openevolve", "openevolve.container"]
 
 [project]
-name = "funsearch"
+name = "openevolve"
 dynamic = [
   "version",
 ]
@@ -31,4 +31,4 @@ dependencies = [
 ]
 
 [project.scripts]
-funsearch = "funsearch.__main__:main"
+openevolve = "openevolve.__main__:main"

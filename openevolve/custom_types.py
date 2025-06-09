@@ -17,7 +17,6 @@ class FuncMeta:
     Metadata for a function
     
     """
-
     file_path: Path
     qualname: str
     line_no: int

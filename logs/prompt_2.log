@@ -1,0 +1,246 @@
+└── project/
+    └── astropy/
+        └── coordinates/
+            ├── funcs.py
+            │   └── concatenate(coords)
+            ├── sky_coordinate.py
+            │   └── class SkyCoord:
+            │       └── __init__(self, copy=True, *args, **kwargs)
+            ├── sky_coordinate_parsers.py
+            │   ├── _parse_coordinate_data(frame, args, kwargs)
+            │   └── _parse_coordinate_arg(coords, frame, units, init_kwargs)
+            └── angles/
+                └── core.py
+                    ├── class Longitude:
+                    │   ├── __new__(cls, angle, unit=None, wrap_angle=None, **kwargs)
+                    │   └── wrap_angle(self)
+                    └── class Angle:
+                        └── _wrap_at(self, wrap_angle)
+
+# Start of Program Version 0 (*_v0)
+#astropy/coordinates/funcs.py: concatenate
+
+def concatenate_v0(coords):
+    '\n    Combine multiple coordinate objects into a single\n    `~astropy.coordinates.SkyCoord`.\n\n    "Coordinate objects" here mean frame objects with data,\n    `~astropy.coordinates.SkyCoord`, or representation objects.  Currently,\n    they must all be in the same frame, but in a future version this may be\n    relaxed to allow inhomogeneous sequences of objects.\n\n    Parameters\n    ----------\n    coords : sequence of coordinate-like\n        The objects to concatenate\n\n    Returns\n    -------\n    cskycoord : SkyCoord\n        A single sky coordinate with its data set to the concatenation of all\n        the elements in ``coords``\n    '
+    if getattr(coords, 'isscalar', False) or not isiterable(coords):
+        raise TypeError('The argument to concatenate must be iterable')
+    scs = [SkyCoord(coord, copy=False) for coord in coords]
+    for sc in scs[1:]:
+        if not sc.is_equivalent_frame(scs[0]):
+            raise ValueError(f'All inputs must have equivalent frames: {sc} != {scs[0]}')
+    return SkyCoord(concatenate_representations([c.data for c in coords]), frame=scs[0].frame)
+
+#astropy/coordinates/sky_coordinate.py: SkyCoord.__init__
+
+def __init___v0(self, **kwargs, *args, copy=True):
+    self._extra_frameattr_names = set()
+    if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], (BaseCoordinateFrame, SkyCoord)):
+        coords = args[0]
+        if isinstance(coords, SkyCoord):
+            self._extra_frameattr_names = coords._extra_frameattr_names
+            self.info = coords.info
+            for attr_name in self._extra_frameattr_names:
+                setattr(self, attr_name, getattr(coords, attr_name))
+            coords = coords.frame
+        if not coords.has_data:
+            raise ValueError('Cannot initialize from a coordinate frame instance without coordinate data')
+        if copy:
+            self._sky_coord_frame = coords.copy()
+        else:
+            self._sky_coord_frame = coords
+    else:
+        frame_cls, frame_kwargs = _get_frame_without_data(args, kwargs)
+        args = list(args)
+        skycoord_kwargs, components, info = _parse_coordinate_data(frame_cls(**frame_kwargs), args, kwargs)
+        for attr in skycoord_kwargs:
+            setattr(self, attr, skycoord_kwargs[attr])
+        if info is not None:
+            self.info = info
+        frame_kwargs.update(components)
+        self._sky_coord_frame = frame_cls(copy=copy, **frame_kwargs)
+        if not self._sky_coord_frame.has_data:
+            raise ValueError('Cannot create a SkyCoord without data')
+
+#astropy/coordinates/sky_coordinate_parsers.py: _parse_coordinate_data
+
+def _parse_coordinate_data_v0(args, frame, kwargs):
+    '\n    Extract coordinate data from the args and kwargs passed to SkyCoord.\n\n    By this point, we assume that all of the frame attributes have been\n    extracted from kwargs (see _get_frame_without_data()), so all that are left\n    are (1) extra SkyCoord attributes, and (2) the coordinate data, specified in\n    any of the valid ways.\n    '
+    valid_skycoord_kwargs = {}
+    valid_components = {}
+    info = None
+    attr_names = list(kwargs.keys())
+    for attr in attr_names:
+        if attr in frame_transform_graph.frame_attributes:
+            valid_skycoord_kwargs[attr] = kwargs.pop(attr)
+    units = _get_representation_component_units(args, kwargs)
+    valid_components.update(_get_representation_attrs(frame, units, kwargs))
+    if kwargs:
+        pm_message = ''
+        if frame.representation_type == SphericalRepresentation:
+            frame_names = list(frame.get_representation_component_names().keys())
+            lon_name = frame_names[0]
+            lat_name = frame_names[1]
+            if f'pm_{lon_name}' in list(kwargs.keys()):
+                pm_message = f'\n\n By default, most frame classes expect the longitudinal proper motion to include the cos(latitude) term, named `pm_{lon_name}_cos{lat_name}`. Did you mean to pass in this component?'
+        raise ValueError('Unrecognized keyword argument(s) {}{}'.format(', '.join((f"'{key}'" for key in kwargs)), pm_message))
+    if args:
+        if len(args) == 1:
+            _skycoord_kwargs, _components = _parse_coordinate_arg(args[0], frame, units, kwargs)
+            if 'info' in getattr(args[0], '__dict__', ()):
+                info = args[0].info
+        elif len(args) <= 3:
+            _skycoord_kwargs = {}
+            _components = {}
+            frame_attr_names = frame.representation_component_names.keys()
+            repr_attr_names = frame.representation_component_names.values()
+            for arg, frame_attr_name, repr_attr_name, unit in zip(args, frame_attr_names, repr_attr_names, units):
+                attr_class = frame.representation_type.attr_classes[repr_attr_name]
+                _components[frame_attr_name] = attr_class(arg, unit=unit)
+        else:
+            raise ValueError(f'Must supply no more than three positional arguments, got {len(args)}')
+        for attr, coord_value in _components.items():
+            if attr in valid_components:
+                raise ValueError(_conflict_err_msg.format(attr, coord_value, valid_components[attr], 'SkyCoord'))
+            valid_components[attr] = coord_value
+        for attr, value in _skycoord_kwargs.items():
+            if attr in valid_skycoord_kwargs and np.any(valid_skycoord_kwargs[attr] != value):
+                raise ValueError(_conflict_err_msg.format(attr, value, valid_skycoord_kwargs[attr], 'SkyCoord'))
+            valid_skycoord_kwargs[attr] = value
+    return (valid_skycoord_kwargs, valid_components, info)
+
+#astropy/coordinates/sky_coordinate_parsers.py: _parse_coordinate_arg
+
+def _parse_coordinate_arg_v0(coords, frame, init_kwargs, units):
+    '\n    Single unnamed arg supplied.  This must be:\n    - Coordinate frame with data\n    - Representation\n    - SkyCoord\n    - List or tuple of:\n      - String which splits into two values\n      - Iterable with two values\n      - SkyCoord, frame, or representation objects.\n\n    Returns a dict mapping coordinate attribute names to values (or lists of\n    values)\n    '
+    from .sky_coordinate import SkyCoord
+    is_scalar = False
+    components = {}
+    skycoord_kwargs = {}
+    frame_attr_names = list(frame.representation_component_names.keys())
+    repr_attr_names = list(frame.representation_component_names.values())
+    repr_attr_classes = list(frame.representation_type.attr_classes.values())
+    n_attr_names = len(repr_attr_names)
+    if isinstance(coords, str):
+        is_scalar = True
+        coords = [coords]
+    if isinstance(coords, (SkyCoord, BaseCoordinateFrame)):
+        if not coords.has_data:
+            raise ValueError('Cannot initialize from a frame without coordinate data')
+        data = coords.data.represent_as(frame.representation_type)
+        if isinstance(coords.data, UnitSphericalRepresentation):
+            try:
+                index = repr_attr_names.index('distance')
+            except ValueError:
+                pass
+            else:
+                del repr_attr_names[index]
+                del units[index]
+                del frame_attr_names[index]
+                del repr_attr_classes[index]
+        values = [getattr(data, name) for name in repr_attr_names]
+        if coords.data.differentials and 's' in coords.data.differentials:
+            orig_vel = coords.data.differentials['s']
+            vel = coords.data.represent_as(frame.representation_type, frame.get_representation_cls('s')).differentials['s']
+            for frname, reprname in frame.get_representation_component_names('s').items():
+                if reprname == 'd_distance' and (not hasattr(orig_vel, reprname)) and ('unit' in orig_vel.get_name()):
+                    continue
+                values.append(getattr(vel, reprname))
+                units.append(None)
+                frame_attr_names.append(frname)
+                repr_attr_names.append(reprname)
+                repr_attr_classes.append(vel.attr_classes[reprname])
+        is_skycoord = isinstance(coords, SkyCoord)
+        for attr in frame_transform_graph.frame_attributes:
+            if (value := getattr(coords, attr, None)) is not None and (is_skycoord or attr not in coords.frame_attributes):
+                skycoord_kwargs[attr] = value
+    elif isinstance(coords, BaseRepresentation):
+        if coords.differentials and 's' in coords.differentials:
+            diffs = frame.get_representation_cls('s')
+            data = coords.represent_as(frame.representation_type, diffs)
+            values = [getattr(data, name) for name in repr_attr_names]
+            for frname, reprname in frame.get_representation_component_names('s').items():
+                values.append(getattr(data.differentials['s'], reprname))
+                units.append(None)
+                frame_attr_names.append(frname)
+                repr_attr_names.append(reprname)
+                repr_attr_classes.append(data.differentials['s'].attr_classes[reprname])
+        else:
+            data = coords.represent_as(frame.representation_type)
+            values = [getattr(data, name) for name in repr_attr_names]
+    elif isinstance(coords, np.ndarray) and coords.dtype.kind in 'if' and (coords.ndim == 2) and (coords.shape[1] <= 3):
+        values = coords.transpose()
+    elif isinstance(coords, (Sequence, np.ndarray)):
+        coord_types = (SkyCoord, BaseCoordinateFrame, BaseRepresentation)
+        if any((isinstance(coord, coord_types) for coord in coords)):
+            scs = [SkyCoord(coord, **init_kwargs) for coord in coords]
+            for sc in scs[1:]:
+                if not sc.is_equivalent_frame(scs[0]):
+                    raise ValueError(f"List of inputs don't have equivalent frames: {sc} != {scs[0]}")
+            not_unit_sphere = not isinstance(scs[0].data, UnitSphericalRepresentation)
+            for fattrnm in scs[0].frame.frame_attributes:
+                skycoord_kwargs[fattrnm] = getattr(scs[0].frame, fattrnm)
+            for fattrnm in scs[0]._extra_frameattr_names:
+                skycoord_kwargs[fattrnm] = getattr(scs[0], fattrnm)
+            values = [np.concatenate([np.atleast_1d(getattr(sc, data_attr)) for sc in scs]) for data_attr, repr_attr in zip(frame_attr_names, repr_attr_names) if not_unit_sphere or repr_attr != 'distance']
+        else:
+            is_radec = 'ra' in frame.representation_component_names and 'dec' in frame.representation_component_names
+            vals = [_parse_one_coord_str(c, is_radec=is_radec) if isinstance(c, str) else c for c in coords]
+            try:
+                n_coords = {len(x) for x in vals}
+            except Exception as err:
+                raise ValueError('One or more elements of input sequence does not have a length.') from err
+            if len(n_coords) > 1:
+                raise ValueError(f'Input coordinate values must have same number of elements, found {sorted(n_coords)}')
+            n_coords = n_coords.pop()
+            if n_coords > n_attr_names:
+                raise ValueError(f'Input coordinates have {n_coords} values but representation {frame.representation_type.get_name()} only accepts {n_attr_names}')
+            values = [list(x) for x in zip(*vals)]
+            if is_scalar:
+                values = [x[0] for x in values]
+    else:
+        raise ValueError('Cannot parse coordinates from first argument')
+    try:
+        for frame_attr_name, repr_attr_class, value, unit in zip(frame_attr_names, repr_attr_classes, values, units):
+            components[frame_attr_name] = repr_attr_class(value, unit=unit, copy=COPY_IF_NEEDED)
+    except Exception as err:
+        raise ValueError(f'Cannot parse first argument data "{value}" for attribute {frame_attr_name}') from err
+    return (skycoord_kwargs, components)
+
+#astropy/coordinates/angles/core.py: Longitude.__new__
+
+def __new___v0(**kwargs, angle, cls, unit=None, wrap_angle=None):
+    if isinstance(angle, Latitude):
+        raise TypeError('A Longitude angle cannot be created from a Latitude angle.')
+    self = super().__new__(cls, angle, unit=unit, **kwargs)
+    if wrap_angle is None:
+        wrap_angle = getattr(angle, 'wrap_angle', self._default_wrap_angle)
+    self.wrap_angle = wrap_angle
+    return self
+
+#astropy/coordinates/angles/core.py: Longitude.wrap_angle
+
+def wrap_angle_v0(self):
+    return self._wrap_angle
+
+#astropy/coordinates/angles/core.py: Angle._wrap_at
+
+def _wrap_at_v0(self, wrap_angle):
+    '\n    Implementation that assumes ``angle`` is already validated\n    and that wrapping is inplace.\n    '
+    a360 = u.degree.to(self.unit, 360.0)
+    wrap_angle = wrap_angle.to_value(self.unit)
+    self_angle = self.view(np.ndarray)
+    if NUMPY_LT_2_0:
+        self_angle = self_angle[np.newaxis]
+    else:
+        wrap_angle = float(wrap_angle)
+    wrap_angle_floor = wrap_angle - a360
+    with np.errstate(invalid='ignore'):
+        wraps = (self_angle - wrap_angle_floor) // a360
+    valid = np.isfinite(wraps) & (wraps != 0)
+    if np.any(valid):
+        self_angle -= wraps * a360
+        self_angle[self_angle >= wrap_angle] -= a360
+        self_angle[self_angle < wrap_angle_floor] += a360
+
+# End of Program Version 0
+
