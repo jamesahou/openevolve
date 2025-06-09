@@ -1,4 +1,4 @@
-from openevolve.code_manipulation_2 import Program, Function, Decorator, str_to_functions
+from openevolve.code_manipulation import Program, Function, Decorator, str_to_functions
 from typing import Iterable
 from enum import Enum
 import os
@@ -132,32 +132,6 @@ class ProjectTree:
         return _pretty_print(self.tree)
 
 class ProjectIndexer:
-    def __init__(self, project_root: str):
-        self.project_root = project_root
-        self.project_tree = ProjectTree()
-        self._build_project_tree()
-
-    def _build_project_tree(self):
-        for dirpath, _, filenames in os.walk(self.project_root):
-            for filename in filenames:
-                if filename.endswith(".py"):
-                    # Read the file content
-                    filepath = os.path.join(dirpath, filename)
-
-                    with open(filepath, "r") as file:
-                        code = file.read()
-
-                    # Extract all functions from the code string
-                    program = Program.from_code(code)
-
-                    # Write the filepath to each function in the program
-                    for function in program.functions:
-                        function.path = os.path.relpath(filepath, self.project_root)
-
-                    # Insert each function into the project tree
-                    for function in program.functions:
-                        self.project_tree.insert_function(function)
-
     @classmethod
     def get_tree_description(cls, program: Program, workspace_path: str | None = None) -> str:
         """

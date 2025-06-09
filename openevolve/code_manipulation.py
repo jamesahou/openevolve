@@ -1,253 +1,250 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+from openevolve.structured_outputs import ProgramImplementation
 
-"""Tools for manipulating Python code.
-
-It implements 2 classes representing unities of code:
-- Function, containing all the information we need about functions: name, args,
-  body and optionally a return type and a docstring.
-- Program, which contains a code preface (which could be imports, global
-  variables and classes, ...) and a list of Functions.
-"""
-import ast
-from collections.abc import Iterator, MutableSet, Sequence
 import dataclasses
 import io
-import tokenize
+import ast
+import textwrap
+from typing import List, Tuple, Sequence, Any, Dict, Iterable
+import re
+from enum import Enum
+from openevolve.custom_types import FullName, FuncMeta
 
-from absl import logging
+@dataclasses.dataclass
+class FuncHeader:
+    """A parsed Python function header."""
 
+    name: str
+    args: List[str]
+    return_type: str = ""
+
+    def __str__(self) -> str:
+        """Return the function header as a string."""
+        args = sorted(self.args, key=lambda x: (x != "self", x))
+        args = ", ".join(args)
+        if self.return_type:
+            return f"def {self.name}({args}) -> {self.return_type}:"
+        else:
+            return f"def {self.name}({args}):"
+
+    def __hash__(self):
+        return hash(str(self))
+
+
+class Decorator(Enum):
+    NONE = ""
+    CLASSMETHOD = "classmethod"
+    STATICMETHOD = "staticmethod"
+    PROPERTY = "property"
 
 @dataclasses.dataclass
 class Function:
-  """A parsed Python function."""
+    """A parsed Python function."""
 
-  name: str
-  args: str
-  body: str
-  return_type: str | None = None
-  docstring: str | None = None
+    name: str
+    header: FuncHeader
+    body: str
+    path: str = ""
+    line_no: int = 0
+    qualname: str = ""
+    decorator: Decorator = Decorator.NONE
 
-  def __str__(self) -> str:
-    return_type = f' -> {self.return_type}' if self.return_type else ''
+    def __str__(self) -> str:
+        header_str = str(self.header).strip()
+        body = self.body.strip()
+        if not body.endswith("\n"):
+            body += "\n"
+        indented_body = textwrap.indent(body, "    ")
+        return f"{header_str}\n{indented_body}"
 
-    function = f'def {self.name}({self.args}){return_type}:\n'
-    if self.docstring:
-      # self.docstring is already indented on every line except the first one.
-      # Here, we assume the indentation is always two spaces.
-      new_line = '\n' if self.body else ''
-      function += f'  """{self.docstring}"""{new_line}'
-    # self.body is already indented.
-    function += self.body + '\n\n'
-    return function
+    def to_str(self, version: int | None = None) -> str:
+        """Return the function as a string.
+        If *version* is given, the function name in the header is suffixed with
+        ``_v<version>`` (e.g. ``def foo()`` → ``def foo_v1()``).  Otherwise this is
+        identical to ``str(self)``.
+        """
+        if version is None:
+            return str(self)
+        header_copy = FuncHeader(
+            name=f"{self.header.name}_v{version}",
+            args=list(self.header.args),
+            return_type=self.header.return_type,
+        )
+        body = self.body.strip()
+        indented_body = textwrap.indent(body, "    ")
+        return f"{header_copy}\n{indented_body}"
 
-  def __setattr__(self, name: str, value: str) -> None:
-    # Ensure there aren't leading & trailing new lines in `body`.
-    if name == 'body':
-      value = value.strip('\n')
-    # Ensure there aren't leading & trailing quotes in `docstring``.
-    if name == 'docstring' and value is not None:
-      if '"""' in value:
-        value = value.strip()
-        value = value.replace('"""', '')
-    super().__setattr__(name, value)
+    def __setattr__(self, name: str, value: str) -> None:
+        # Ensure there aren't leading & trailing new lines in `body`.
+        if name == "body":
+            value = value.strip("\n")
+        super().__setattr__(name, value)
 
 
 @dataclasses.dataclass(frozen=True)
 class Program:
-  """A parsed Python program."""
+    """A parsed Python program."""
 
-  # `preface` is everything from the beginning of the code till the first
-  # function is found.
-  preface: str
-  functions: list[Function]
+    functions: list[Function]
 
-  def __str__(self) -> str:
-    program = f'{self.preface}\n' if self.preface else ''
-    program += '\n'.join([str(f) for f in self.functions])
-    return program
+    def __str__(self) -> str:
+        return "\n\n".join(str(f) for f in self.functions)
 
-  def find_function_index(self, function_name: str) -> int:
-    """Returns the index of input function name."""
-    function_names = [f.name for f in self.functions]
-    count = function_names.count(function_name)
-    if count == 0:
-      raise ValueError(
-          f'function {function_name} does not exist in program:\n{str(self)}'
-      )
-    if count > 1:
-      raise ValueError(
-          f'function {function_name} exists more than once in program:\n'
-          f'{str(self)}'
-      )
-    index = function_names.index(function_name)
-    return index
+    def to_str(self, version: int | None = None) -> str:
+        """Return the function as a string.
+        The function name in the header forall functions is suffixed with
+        ``_v<version>`` (e.g. ``def foo()`` becomes ``def foo_v1()``).
+        """
+        return "\n\n".join(f.to_str(version) for f in self.functions)
 
-  def get_function(self, function_name: str) -> Function:
-    index = self.find_function_index(function_name)
-    return self.functions[index]
+    @classmethod
+    def from_code(cls, code: str) -> "Program":
+        """Parse a Python program from a string."""
+        functions = str_to_functions(code)
+        return Program(functions=functions)
 
 
-class ProgramVisitor(ast.NodeVisitor):
-  """Parses code to collect all required information to produce a `Program`.
+def _str_to_functions(node: ast.AST, qualname: str = "") -> Iterable[Function]:
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, ast.ClassDef):
+            class_node: ast.ClassDef = child
+            yield from _str_to_functions(child, qualname + '.' + class_node.name)
+        elif isinstance(child, ast.FunctionDef):
+            function_node: ast.FunctionDef = child
 
-  Note that we do not store function decorators.
-  """
+            args = []
 
-  def __init__(self, sourcecode: str):
-    self._codelines: list[str] = sourcecode.splitlines()
+            pos_args = function_node.args.args
+            pos_defaults = function_node.args.defaults
+            pos_default_start = len(pos_args) - len(pos_defaults)
 
-    self._preface: str = ''
-    self._functions: list[Function] = []
-    self._current_function: str | None = None
+            for i, arg in enumerate(pos_args):
+              if i < pos_default_start:
+                args.append(arg.arg)
+              else:
+                default_value = ast.unparse(pos_defaults[i - pos_default_start])
+                args.append(f"{arg.arg}={default_value}")
 
-  def visit_FunctionDef(self,  # pylint: disable=invalid-name
-                        node: ast.FunctionDef) -> None:
-    """Collects all information about the function being parsed."""
-    if node.col_offset == 0:  # We only care about first level functions.
-      self._current_function = node.name
-      if not self._functions:
-        self._preface = '\n'.join(self._codelines[:node.lineno - 1])
-      function_end_line = node.end_lineno
-      body_start_line = node.body[0].lineno - 1
-      # Extract the docstring.
-      docstring = None
-      if isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value,
-                                                           ast.Str):
-        docstring = f'  """{ast.literal_eval(ast.unparse(node.body[0]))}"""'
-        if len(node.body) > 1:
-          body_start_line = node.body[1].lineno - 1
-        else:
-          body_start_line = function_end_line
+            kwonly_args = function_node.args.kwonlyargs
+            kw_defaults = function_node.args.kw_defaults
 
-      self._functions.append(Function(
-          name=node.name,
-          args=ast.unparse(node.args),
-          return_type=ast.unparse(node.returns) if node.returns else None,
-          docstring=docstring,
-          body='\n'.join(self._codelines[body_start_line:function_end_line]),
-      ))
-    self.generic_visit(node)
+            for i, arg in enumerate(kwonly_args):
+              if i < len(kw_defaults) and kw_defaults[i] is not None:
+                default_value = ast.unparse(kw_defaults[i])
+                args.append(f"{arg.arg}={default_value}")
+              else:
+                args.append(arg.arg)
 
-  def return_program(self) -> Program:
-    return Program(preface=self._preface, functions=self._functions)
+            if function_node.args.vararg:
+              args.append(f"*{function_node.args.vararg.arg}")
+            if function_node.args.kwarg:
+              args.append(f"**{function_node.args.kwarg.arg}")
 
+            header = FuncHeader(
+              name=function_node.name,
+              args=args,
+              return_type=(
+                ast.unparse(function_node.returns) if function_node.returns else ""
+              ),
+            )
 
-def text_to_program(text: str) -> Program:
-  """Returns Program object by parsing input text using Python AST."""
-  try:
-    # We assume that the program is composed of some preface (e.g. imports,
-    # classes, assignments, ...) followed by a sequence of functions.
-    tree = ast.parse(text)
-    visitor = ProgramVisitor(text)
-    visitor.visit(tree)
-    return visitor.return_program()
-  except Exception as e:
-    logging.warning('Failed parsing %s', text)
-    raise e
+            decorators = function_node.decorator_list
 
+            if decorators and isinstance(decorators[0], ast.Name):
+                decorator = Decorator(decorators[0].id)
+            else:
+                decorator = Decorator.NONE
 
-def text_to_function(text: str) -> Function:
-  """Returns Function object by parsing input text using Python AST."""
-  program = text_to_program(text)
-  if len(program.functions) != 1:
-    raise ValueError(f'Only one function expected, got {len(program.functions)}'
-                     f':\n{program.functions}')
-  return program.functions[0]
+            function = Function(
+                name=function_node.name,
+                header=header,
+                body=ast.unparse(function_node.body).strip(),
+                path="",  # Path is not available in this context
+                line_no=function_node.lineno,
+                qualname=(qualname + '.' + function_node.name)[1:],
+                decorator=decorator
+            )
 
+            yield function
 
-def _tokenize(code: str) -> Iterator[tokenize.TokenInfo]:
-  """Transforms `code` into Python tokens."""
-  code_bytes = code.encode()
-  code_io = io.BytesIO(code_bytes)
-  return tokenize.tokenize(code_io.readline)
+def str_to_functions(generated_code: str) -> List[Function]:
+    """Given a string with code, returns a list of Function objects."""
+    tree = ast.parse(generated_code)
+    return list(_str_to_functions(tree))
 
-
-def _untokenize(tokens: Sequence[tokenize.TokenInfo]) -> str:
-  """Transforms a list of Python tokens into code."""
-  code_bytes = tokenize.untokenize(tokens)
-  return code_bytes.decode()
+def str_to_function(
+    generated_code: str,
+) -> Function:
+    """Given a string with code, returns a single Function object."""
+    functions = str_to_functions(generated_code)
+    if len(functions) != 1:
+        raise ValueError("Expected exactly one function in the generated code.")
+    return functions[0]
 
 
-def _yield_token_and_is_call(
-    code: str) -> Iterator[tuple[tokenize.TokenInfo, bool]]:
-  """Yields each token with a bool indicating whether it is a function call."""
-  try:
-    tokens = _tokenize(code)
-    prev_token = None
-    is_attribute_access = False
-    for token in tokens:
-      if (prev_token and  # If the previous token exists and
-          prev_token.type == tokenize.NAME and  # it is a Python identifier
-          token.type == tokenize.OP and  # and the current token is a delimiter
-          token.string == '('):  # and in particular it is '('.
-        yield prev_token, not is_attribute_access
-        is_attribute_access = False
-      else:
-        if prev_token:
-          is_attribute_access = (
-              prev_token.type == tokenize.OP and prev_token.string == '.'
-          )
-          yield prev_token, False
-      prev_token = token
-    if prev_token:
-      yield prev_token, False
-  except Exception as e:
-    logging.warning('Failed parsing %s', code)
-    raise e
+def str_to_program(
+    generated_code: str,
+) -> Program:
+    """Given a string with code, returns a Program object."""
+    functions = str_to_functions(generated_code)
+    return Program(functions=functions)
 
 
-def rename_function_calls(code: str, source_name: str, target_name: str) -> str:
-  """Renames function calls from `source_name` to `target_name`."""
-  if source_name not in code:
-    return code
-  modified_tokens = []
-  for token, is_call in _yield_token_and_is_call(code):
-    if is_call and token.string == source_name:
-      # Replace the function name token
-      modified_token = tokenize.TokenInfo(
-          type=token.type,
-          string=target_name,
-          start=token.start,
-          end=token.end,
-          line=token.line,
-      )
-      modified_tokens.append(modified_token)
-    else:
-      modified_tokens.append(token)
-  return _untokenize(modified_tokens)
+def structured_output_to_functions(
+    structured_output: ProgramImplementation,
+) -> dict[FullName, Function]:
+    """Given a structured output from the LLM, returns a mapping from function qualnames to Function objects."""
+    functions: Dict[FullName, Function] = {}
+    for structured_function in structured_output.functions:
+        function = str_to_function(structured_function.code)
+        function.qualname = structured_function.qualname
+        function.path = structured_function.filepath
+        functions[structured_function.filepath + ' ' + structured_function.qualname] = function
+    return functions
 
 
-def get_functions_called(code: str) -> MutableSet[str]:
-  """Returns the set of all functions called in `code`."""
-  return set(token.string for token, is_call in
-             _yield_token_and_is_call(code) if is_call)
+def header_from_str(header_str: str) -> FuncHeader:
+    """Parse a function header from a string."""
+    if header_str.strip().endswith(":"):
+        header_str = f"{header_str}\n    pass"
+    func = str_to_function(header_str)
+    return func.header
+
+def structured_output_to_prog_meta(
+    structured_output: ProgramImplementation,
+    program_meta: Dict[FullName, FuncMeta],
+) -> Program:
+    """Given a structured output from the LLM and program metadata, returns a Program object."""
+
+    # Check if the sample contains all the expected keys
+    expected_keys = set(program_meta.keys())
+    actual_keys = {f.filepath + ' ' + f.qualname for f in structured_output.functions}
+    if expected_keys != actual_keys:
+        raise ValueError(
+            f"Expected keys {expected_keys} but got {actual_keys} in structured output."
+        )
+    
+    functions = structured_output_to_functions(structured_output)
+    
+    # check if headers are same
+    expected_headers = {str(header_from_str(meta.header)) for meta in program_meta.values()}
+    actual_headers = {str(func.header) for func in functions.values()}
+    if expected_headers != actual_headers:
+        raise ValueError(
+            f"Expected headers {expected_headers} but got {actual_headers} in structured output."
+        )
+    
+    # Set the metadata for each function
+    for func in functions.values():
+        meta = program_meta[func.path + ' ' + func.qualname]
+        func.line_no = meta.line_no
+        func.qualname = meta.qualname
+
+    return Program(functions=list(functions.values()))
+  
 
 
-def yield_decorated(code: str, module: str, name: str) -> Iterator[str]:
-  """Yields names of functions decorated with `@module.name` in `code`."""
-  tree = ast.parse(code)
-  for node in ast.walk(tree):
-    if isinstance(node, ast.FunctionDef):
-      for decorator in node.decorator_list:
-        attribute = None
-        if isinstance(decorator, ast.Attribute):
-          attribute = decorator
-        elif isinstance(decorator, ast.Call):
-          attribute = decorator.func
-        if (attribute is not None
-            and attribute.value.id == module
-            and attribute.attr == name):
-          yield node.name
+
+
+    
+
+  
