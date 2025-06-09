@@ -34,9 +34,9 @@ ARG SETUP_RELPATH
 # The evaluation entry point script
 ARG EVAL_RELPATH
 
-COPY ${PROJECT_ROOT} /workspace
-COPY ${SETUP_RELPATH} /setup.sh
-COPY ${EVAL_RELPATH} /eval.py
+COPY ${PROJECT_ROOT} /home/workspace
+COPY ${SETUP_RELPATH} /home/setup.sh
+COPY ${EVAL_RELPATH} /home/eval.py
 
 # Install git
 RUN apt-get update && \
@@ -46,28 +46,29 @@ RUN apt-get update && \
 RUN pip install --upgrade pip
 
 # Clone the main entry point gist
-RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /openevolve_gists
-RUN mv /openevolve_gists/openevolve_sandbox_main.py /main.py
-RUN rm -rf /openevolve_gists
+RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /home/openevolve_gists
+RUN mv /home/openevolve_gists/openevolve_sandbox_main.py /home/main.py
+RUN rm -rf /home/openevolve_gists
 
 # Clone the OpenEvolve repository
-RUN git clone https://github.com/jamesahou/openevolve.git /openevolve
+RUN git clone https://github.com/ryanrudes/openevolve.git /home/openevolve
 
 # Install OpenEvolve
-RUN cd /openevolve && \
+RUN cd /home/openevolve && \
     pip install -e .
 
-RUN mkdir /inputs
-RUN mkdir /outputs
-RUN mkdir /logs
+RUN mkdir /home/inputs
+RUN mkdir /home/outputs
+RUN mkdir /home/logs
 
-WORKDIR /workspace
+WORKDIR /home/workspace
 
 RUN if [ -z "$SETUP_FILE" ]; then \
         echo "No setup file provided."; \
     else \
         echo "Using setup file: $SETUP_FILE" && \
-        /bin/bash /setup.sh; \
+        cd /home/workspace && \
+        /bin/bash /home/setup.sh; \
     fi
 
 WORKDIR /
