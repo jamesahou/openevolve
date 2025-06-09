@@ -47,9 +47,9 @@ RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /open
 RUN mv /openevolve_gists/openevolve_sandbox_main.py /main.py
 RUN rm -rf /openevolve_gists
 
-COPY ./funsearch/container/main.py /main.py
+# This is temporary and should later be replaced with a git clone of the openevolve repository
+COPY ./openevolve /openevolve
 
-COPY . /openevolve
 RUN cd /openevolve && \
     pip install -e .
 
