@@ -13,7 +13,6 @@ from openevolve import sandbox
 from openevolve.structured_outputs import ProgramImplementation
 from openevolve.test_case import TestCase
 
-import pathlib
 import os
 
 class ImplementationsManager:
