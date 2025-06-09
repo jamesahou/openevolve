@@ -21,7 +21,7 @@ from openevolve.custom_types import (
     ContainerAbsPath,
     ContainerRelPath
 )
-from openevolve import config, core, sandbox, sampler, programs_database_2, code_manipulation_2, evaluator2, extractor
+from openevolve import code_manipulation, config, core, evaluator, programs_database, sandbox, sampler, extractor
 
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -73,17 +73,17 @@ def run(project_root, setup_file, eval_file, tests_file, evolve_depth, model_nam
   if path is None:
     raise ValueError("No initial program found. Make sure that the eval_file is correct and contains a valid program.")
   
-  template = code_manipulation_2.structured_output_to_prog_meta(initial_program, program_meta)
+  template = code_manipulation.structured_output_to_prog_meta(initial_program, program_meta)
   ex.add_decorators(program_meta)
   try:
     conf = config.Config(num_evaluators=1)
-    database = programs_database_2.ProgramsDatabase(
+    database = programs_database.ProgramsDatabase(
       conf.programs_database, template, worskpace=workspace, identifier=timestamp)
     if load_backup:
       database.load(load_backup)
 
     sbox = sandbox.ContainerSandbox(workspace, eval_file, imps_path, setup_file=setup_file)
-    evaluators = [evaluator2.AsyncEvaluator(
+    evaluators = [evaluator.AsyncEvaluator(
       database,
       sbox,
       template,

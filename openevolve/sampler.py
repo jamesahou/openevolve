@@ -23,7 +23,7 @@ import time
 import logging
 from openai import OpenAI
 
-from openevolve import evaluator2
+from openevolve import code_manipulation, evaluator
 from openevolve import programs_database
 from openevolve.structured_outputs import ProgramImplementation
 
@@ -116,7 +116,7 @@ class Sampler:
     def __init__(
         self,
         database: programs_database.ProgramsDatabase,
-        evaluators: Sequence[evaluator2.AsyncEvaluator],
+        evaluators: Sequence[evaluator.AsyncEvaluator],
         model: LLM | vLLM,
         uid: int = 0,
     ) -> None:
@@ -157,7 +157,7 @@ class Sampler:
 if __name__ == "__main__":
     from pathlib import Path
     import logging
-    from openevolve import extractor, project_indexer, code_manipulation_2
+    from openevolve import extractor, project_indexer
     import pathlib
 
     logging.basicConfig(level=logging.INFO)
@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     spec_structured, path, program_meta = extractor.extract_code(eval_path, args)
 
-    program = code_manipulation_2.structured_output_to_prog_meta(spec_structured, program_meta)
+    program = code_manipulation.structured_output_to_prog_meta(spec_structured, program_meta)
     file_hierarchy = project_indexer.ProjectIndexer.get_tree_description(program, base_dir)
 
     def build_prompt_from_spec_structured(program, file_hierarchy: str = "# File Hierarchy\n") -> str:

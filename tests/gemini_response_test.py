@@ -1,8 +1,8 @@
 from openai import OpenAI
 import pathlib
 
-from openevolve import extractor, project_indexer, evaluator2, code_manipulation_2
-from openevolve.code_manipulation_2 import Function
+from openevolve import code_manipulation, evaluator, extractor, project_indexer
+from openevolve.code_manipulation import Function
 from openevolve.structured_outputs import ProgramImplementation
 import textwrap
 from IPython import embed
@@ -13,7 +13,7 @@ base_dir = pathlib.Path("/Users/jameshou/Documents/Code/openevolve/examples/astr
 
 spec_structured, path, program_meta = extractor.extract_code(eval_path, args)
 
-program = code_manipulation_2.structured_output_to_prog_meta(spec_structured, program_meta)
+program = code_manipulation.structured_output_to_prog_meta(spec_structured, program_meta)
 file_hierarchy = project_indexer.ProjectIndexer.get_tree_description(program, base_dir)
 
 def build_prompt_from_spec_structured(program, file_hierarchy: str = "# File Hierarchy\n") -> str:
