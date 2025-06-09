@@ -1,6 +1,8 @@
-from openevolve.code_manipulation import Program, Function, Decorator, str_to_functions
+from openevolve.code_manipulation import Program, Function, Decorator
+
 from typing import Iterable
 from enum import Enum
+
 import os
 
 class TreeSymbol(Enum):
