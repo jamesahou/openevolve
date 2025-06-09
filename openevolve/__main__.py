@@ -121,24 +121,24 @@ def run(
     try:
         conf = config.Config(num_evaluators=1)
         database = programs_database.ProgramsDatabase(
-            conf.programs_database, template, worskpace=workspace, identifier=timestamp
+            conf.programs_database, template, identifier=timestamp
         )
         if load_backup:
             database.load(load_backup)
 
         sbox = sandbox.ContainerSandbox(
-            workspace, eval_file, imps_path, setup_file=setup_file
+            project_root, imps_path, eval_file, setup_file=setup_file
         )
         evaluators = [
             evaluator.AsyncEvaluator(
                 database,
                 sbox,
                 template,
-                workspace,
+                project_root,
                 eval_file,
                 imps_path,
                 program_meta,
-                inputs,
+                tests,
             )
             for _ in range(conf.num_evaluators)
         ]
