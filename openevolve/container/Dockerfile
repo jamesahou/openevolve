@@ -51,7 +51,7 @@ RUN mv /home/openevolve_gists/openevolve_sandbox_main.py /home/main.py
 RUN rm -rf /home/openevolve_gists
 
 # Clone the OpenEvolve repository
-RUN git clone https://github.com/ryanrudes/openevolve.git /home/openevolve
+RUN git clone https://github.com/jamesahou/openevolve.git /home/openevolve
 
 # Install OpenEvolve
 RUN cd /home/openevolve && \
