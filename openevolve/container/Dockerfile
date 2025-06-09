@@ -50,7 +50,8 @@ RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /open
 RUN mv /openevolve_gists/openevolve_sandbox_main.py /main.py
 RUN rm -rf /openevolve_gists
 
-COPY ./openevolve /openevolve
+# Clone the OpenEvolve repository
+RUN git clone https://github.com/jamesahou/openevolve.git /openevolve
 
 # Install OpenEvolve
 RUN cd /openevolve && \
