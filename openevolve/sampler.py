@@ -184,7 +184,7 @@ if __name__ == "__main__":
         prompt = f"{file_hierarchy}\n"
         prompt += "# Start of Program Version 0 (*_v0)\n"
         for function in program.functions:
-            func_loc_comment = f"#{pathlib.Path(function.path).relative_to(base_dir)}: {function.qualname}\n"
+            func_loc_comment = f"#{function.path}: {function.qualname}\n"
             prompt += f"{func_loc_comment}\n"
             prompt += f"{function.to_str(version=0)}\n\n"
         prompt += "# End of Program Version 0\n\n"
