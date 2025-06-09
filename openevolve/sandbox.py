@@ -217,9 +217,9 @@ class ContainerSandbox(DummySandbox):
 
         # Execute the command to build the image
         logging.debug(f"Executing: {cmd}")
-        ret = os.system(cmd)
+        retcode = os.system(cmd)
 
-        if ret != 0:
+        if retcode != 0:
             raise RuntimeError(
                 f"Failed to build the container image {SANDBOX_IMAGE_NAME}. "
                 "Please check the Dockerfile and the build context."
@@ -295,7 +295,13 @@ class ContainerSandbox(DummySandbox):
             )
 
             logging.debug(f"Copying test cases to container: {cmd}")
-            os.system(cmd)
+            retcode = os.system(cmd)
+
+            if retcode != 0:
+                raise RuntimeError(
+                    f"Failed to upload test cases to the container {SANDBOX_CONTAINER_NAME}. "
+                    "Please check the container engine and the input path."
+                )
         except Exception as e:
             logging.error(f"Failed to upload test cases: {e}")
             raise
@@ -335,7 +341,13 @@ class ContainerSandbox(DummySandbox):
         if cls.container_exists():
             cmd = f"{cls.executable} rm -f {SANDBOX_CONTAINER_NAME}"
             logging.debug(f"Removing container: {cmd}")
-            os.system(cmd)
+            retcode = os.system(cmd)
+
+            if retcode != 0:
+                raise RuntimeError(
+                    f"Failed to remove the container {SANDBOX_CONTAINER_NAME}. "
+                    "Please check the container engine."
+                )
         else:
             logging.debug("No container to remove.")
 
@@ -351,7 +363,13 @@ class ContainerSandbox(DummySandbox):
         )
 
         logging.debug(f"Executing: {cmd}")
-        os.system(cmd)
+        retcode = os.system(cmd)
+
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to start the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine."
+            )
 
     def execute(
         self,
@@ -387,7 +405,13 @@ class ContainerSandbox(DummySandbox):
             f"{SANDBOX_CONTAINER_NAME} mkdir -p {log_dir}"
         )
         logging.debug(f"Creating log directory: {cmd}")
-        os.system(cmd)
+        retcode = os.system(cmd)
+
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to create log directory {log_dir} in the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine."
+            )
 
         stdout_path = log_dir / "stdout.txt"
         stderr_path = log_dir / "stderr.txt"
@@ -419,6 +443,7 @@ class ContainerSandbox(DummySandbox):
             f"'"
         )
         logging.debug(f"Executing: {cmd}")
+        
         return outputs_filepath, os.system(cmd)
 
     def run(
@@ -450,7 +475,13 @@ class ContainerSandbox(DummySandbox):
             f"{output_file.name}"
         )
         logging.debug(f"Copying output file from container: {cmd}")
-        os.system(cmd)
+        retcode = os.system(cmd)
+
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to copy the output file from the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine and the output path."
+            )
 
         # Load the output data from the temporary file
         with open(output_file.name, "rb") as file:
