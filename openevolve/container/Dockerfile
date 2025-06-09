@@ -3,7 +3,7 @@
 # ├── eval.py           # The evaluation script that will be run in the container
 # ├── main.py           # The main entry point for the evaluation
 # ├── workspace/        # The workspace directory containing the project code
-# ├── implementations/  # Directory for implementation files
+# ├── imps/             # Directory for implementation files (mounted as read-only)
 # ├── inputs/           # Directory containing the test case files
 #     ├── 1.pickle
 #     ├── 2.pickle
@@ -30,13 +30,13 @@ FROM docker.io/python:${PYTHON_VERSION}
 # The absolute path to the project root directory on the host file system
 ARG PROJECT_ROOT
 # The setup file will get run from without the workspace directory
-ARG SETUP_FILE
+ARG SETUP_RELPATH
 # The evaluation entry point script
-ARG EVAL_FILE
+ARG EVAL_RELPATH
 
-COPY ${SETUP_FILE} /setup.sh
 COPY ${PROJECT_ROOT} /workspace
-COPY ${EVAL_FILE} /eval.py
+COPY ${SETUP_RELPATH} /setup.sh
+COPY ${EVAL_RELPATH} /eval.py
 
 # Install git
 RUN apt-get update && \
