@@ -1,16 +1,21 @@
 from openevolve.test_case import TestCase
+
 from openevolve.constants import (
     HOTSWAP_ENVVAR,
     SANDBOX_IMAGE_NAME,
     SANDBOX_CONTAINER_NAME,
-    INPUTS_CONTAINER_PATH,
+    CONTAINER_MAIN_PATH,
+    CONTAINER_EVAL_PATH,
+    CONTAINER_LOGS_PATH,
+    CONTAINER_INPUTS_PATH,
+    CONTAINER_OUTPUTS_PATH,
     CONTAINER_PYTHONPATH,
 )
+
 from openevolve.custom_types import (
     HostAbsPath,
     HostRelPath,
     ContainerAbsPath,
-    ContainerRelPath,
 )
 
 from enum import StrEnum
@@ -57,46 +62,49 @@ class ContainerSandbox(DummySandbox):
     def __init__(
         self,
         project_root: HostAbsPath,
-        imps_path: HostAbsPath,
-        eval_file: HostRelPath,
-        python_path: HostAbsPath = CONTAINER_PYTHONPATH,
-        setup_file: HostAbsPath | None = None,
+        imps_root: HostAbsPath,
+        eval_relpath: HostRelPath,
+        setup_relpath: HostRelPath | None = None,
         force_rebuild_container: bool = False,
+        pythonpath: ContainerAbsPath = CONTAINER_PYTHONPATH,
     ):
         """
         Initializes the container sandbox.
 
         Args:
             project_root (HostAbsPath): The absolute path to the project root on the host.
-            imps_path (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
-            eval_file (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
-            python_path (HostAbsPath): The absolute path to the Python interpreter to use on the host. Defaults to `CONTAINER_PYTHONPATH`.
-            setup_file (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
+            imps_root (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+            eval_relpath (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
+            setup_relpath (HostRelPath | None): The path to the setup file for installation on the host, relative to the project root (e.g. "./setup.sh"). If provided, must be a shell script.
             force_rebuild_container (bool): If True, forces the rebuild of the container, even if it already exists.
+            pythonpath (ContainerAbsPath): The absolute path to the Python interpreter to use on the host. Defaults to `CONTAINER_PYTHONPATH`.
         """
         super().__init__()
 
         self.project_root = project_root
-        self.imps_path = imps_path
-        self.python_path = python_path
-        self.eval_file = eval_file
-        self.setup_file = setup_file
+        self.imps_root = imps_root
+        self.eval_relpath = eval_relpath
+        self.setup_relpath = setup_relpath
+        self.pythonpath = pythonpath
+
+        eval_abspath = project_root / eval_relpath
+        setup_abspath = project_root / setup_relpath if setup_relpath else None
 
         # Check if setup_file is a shell script
-        if setup_file is not None and (not setup_file.is_file() or setup_file.suffix != ".sh"):
+        if setup_abspath is not None and (not setup_abspath.is_file() or setup_abspath.suffix != ".sh"):
             raise ValueError(
-                f"setup_file must be a shell script, got {setup_file.suffix}"
+                f"setup_file must be a shell script, got {setup_abspath.suffix}"
             )
 
         # Check that the evaluation entry point is a Python file
-        if not eval_file.is_file() or eval_file.suffix != ".py":
+        if not eval_abspath.is_file() or eval_abspath.suffix != ".py":
             raise ValueError(
-                f"eval_file must be a Python file, got {eval_file.suffix}"
+                f"eval_file must be a Python file, got {eval_abspath.suffix}"
             )
 
-        if not (project_root / eval_file).exists():
+        if not eval_abspath.exists():
             raise FileNotFoundError(
-                f"Evaluation file {eval_file} does not exist in the project root {project_root}."
+                f"Evaluation file {eval_relpath} does not exist in the project root {project_root}."
             )
 
         if self.sandbox_id != 0:
@@ -110,11 +118,13 @@ class ContainerSandbox(DummySandbox):
 
             # Build the container image
             self.build_image(
-                self.project_root,
-                self.imps_path,
-                self.eval_file,
-                self.setup_file,
+                project_root,
+                eval_relpath,
+                setup_relpath,
             )
+
+            # Create the container from the built image
+            self.create_container(imps_root)
 
         # Start the container if it is not already running
         self.start_container()
@@ -154,18 +164,16 @@ class ContainerSandbox(DummySandbox):
     def build_image(
         cls,
         project_root: HostAbsPath,
-        imps_path: HostAbsPath,
-        eval_file: HostRelPath,
-        setup_file: HostAbsPath | None = None,
+        eval_relpath: HostRelPath,
+        setup_relpath: HostAbsPath | None = None,
     ):
         """
         Builds the container image.
         
         Args:
             project_root (HostAbsPath): The absolute path to the project root on the host.
-            imps_path (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
-            eval_file (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
-            setup_file (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
+            eval_relpath (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
+            setup_relpath (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
         """
         version = sys.version.split(" ")[0]
         logging.debug(f"Using Python version: {version}")
@@ -180,11 +188,11 @@ class ContainerSandbox(DummySandbox):
         # Add the setup file as a build argument if provided
         extra = ""
 
-        if setup_file is not None:
-            extra = f'--build-arg SETUP_FILE="{setup_file}"'
+        if setup_relpath is not None:
+            extra = f'--build-arg SETUP_RELPATH="{setup_relpath}"'
 
-        # Set the build context to the root directory of the OpenEvolve project
-        build_context = dockerfile.parent.parent.parent
+        # Set the build context to the project root
+        build_context = project_root
 
         # Prepare the command to build the container image
         cmd = (
@@ -195,7 +203,7 @@ class ContainerSandbox(DummySandbox):
             # Set the build argument for the workspace root
             f"--build-arg PROJECT_ROOT={project_root} "
             # Set the build argument for the evaluation entry point
-            f"--build-arg EVAL_FILE={project_root / eval_file} "
+            f"--build-arg EVAL_RELPATH={eval_relpath} "
             # Tag the image with the name
             f"-t {SANDBOX_IMAGE_NAME} "
             # Use the Dockerfile from the container directory
@@ -208,6 +216,14 @@ class ContainerSandbox(DummySandbox):
         logging.debug(f"Executing: {cmd}")
         os.system(cmd)
 
+    @classmethod
+    def create_container(cls, imps_root: HostAbsPath):
+        """
+        Creates a container from the built image.
+        
+        Args:
+            imps_root (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+        """
         # Create the container
         logging.debug("Creating container from the built image...")
         
@@ -216,11 +232,11 @@ class ContainerSandbox(DummySandbox):
             # Set the container to run in interactive mode
             f"-i "
             # Set the container name
-            f"--name {CONTAINER_NAME} "
+            f"--name {SANDBOX_CONTAINER_NAME} "
             # Mount the implementations directory from the host to /implementations in the container
-            f"--mount type=bind,source={implementations_path},target=/implementations,readonly "
+            f"--mount type=bind,source={imps_root},target=/imps,readonly "
             # Use the built image
-            f"{IMAGE_NAME}:latest"
+            f"{SANDBOX_IMAGE_NAME}:latest"
         )
 
         logging.debug(f"Executing: {cmd}")
@@ -260,7 +276,7 @@ class ContainerSandbox(DummySandbox):
             cmd = (
                 f"{cls.executable} "
                 f"cp {temp_dir}/. "
-                f"{SANDBOX_CONTAINER_NAME}:{INPUTS_CONTAINER_PATH}"
+                f"{SANDBOX_CONTAINER_NAME}:{CONTAINER_INPUTS_PATH}"
             )
 
             logging.debug(f"Copying test cases to container: {cmd}")
@@ -327,7 +343,7 @@ class ContainerSandbox(DummySandbox):
         implementation_id: str,
         test_id: int,
         timeout: float = 30.0,
-    ):
+    ) -> tuple[Path, int]:
         """
         Use podman/docker to execute python in a container.
         - The main.py shall execute the LLM generated method from prog.pickle file providing
@@ -335,32 +351,60 @@ class ContainerSandbox(DummySandbox):
         - main.py writes the output of the method into output.pickle.
         Everything except the /workspace folder will be read-only so that the environment remains good
         for future runs.
+
+        Returns:
+            Path: The absolute path of the output file in the container.
+            int: The exit code of the command executed in the container.
         """
+        inputs_filename = f"{test_id}.pickle"
+        outputs_filename = f"{implementation_id}/output_{test_id}.pickle"
+
+        inputs_filepath = CONTAINER_INPUTS_PATH / inputs_filename
+        outputs_filepath = CONTAINER_OUTPUTS_PATH / outputs_filename
+
+        # Create the directory to store logs for this implementation and test case
+        log_dir = CONTAINER_LOGS_PATH / implementation_id / f"test_{test_id}"
+
+        cmd = (
+            # Use the container engine to execute the command
+            f"{self.executable} exec "
+            # Create the log directory and all necessary parent directories
+            f"{SANDBOX_CONTAINER_NAME} mkdir -p {log_dir}"
+        )
+        logging.debug(f"Creating log directory: {cmd}")
+        os.system(cmd)
+
+        stdout_path = log_dir / "stdout.txt"
+        stderr_path = log_dir / "stderr.txt"
+
         cmd = (
             # Use the container engine to run the command
             f"{self.executable} exec "
             # Set the container to run on
-            f"{CONTAINER_NAME} "
+            f"{SANDBOX_CONTAINER_NAME} "
+            # Run the command in a bash shell
             f"/bin/bash -c '"
             # Set the environment variable for hot-swapping
             f"{HOTSWAP_ENVVAR}={implementation_id} "
             # Call the Python interpreter in the container
-            f"{self.python_path} "
+            f"{self.pythonpath} "
             # Execute the main Python script in the container
-            f"{CONTAINER_MAIN} "
+            f"{CONTAINER_MAIN_PATH} "
             # Pass the paths to the eval program, input file, output file, and log directory
-            f"/eval.py "
-            f"/inputs/{test_id}.pickle "
-            f"/outputs/{implementation_id}/output_{test_id}.pickle "
+            f"{CONTAINER_EVAL_PATH} "
+            f"{inputs_filepath} "
+            f"{outputs_filepath} "
             # Pass the timeout to the main script
             f"{timeout} "
             # Pipe the standard output to a log file
-            f"> /logs/{implementation_id}_test_{test_id}_stdout.txt "
+            f"> {stdout_path} "
             # Pipe the standard error output to a log file
-            f"2> /logs/{implementation_id}_test_{test_id}_stderr.txt' "
+            f"2> {stderr_path} "
+            # Close the command string
+            f"'"
         )
         logging.debug(f"Executing: {cmd}")
-        return os.system(cmd)
+        return outputs_filepath, os.system(cmd)
 
     def run(
         self,
@@ -379,7 +423,7 @@ class ContainerSandbox(DummySandbox):
         Returns:
             Any: The returned output from the evaluator function, run on the test case.
         """
-        self.execute(implementation_id, test_id, timeout)
+        output_filepath, retcode = self.execute(implementation_id, test_id, timeout)
 
         # Create a temporary file to store the output
         output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pickle")
@@ -387,7 +431,7 @@ class ContainerSandbox(DummySandbox):
         # Copy the output file from the container to the host
         cmd = (
             f"{self.executable} cp "
-            f"{CONTAINER_NAME}:/outputs/{implementation_id}/output_{test_id}.pickle "
+            f"{SANDBOX_CONTAINER_NAME}:{output_filepath} "
             f"{output_file.name}"
         )
         logging.debug(f"Copying output file from container: {cmd}")
@@ -402,6 +446,7 @@ class ContainerSandbox(DummySandbox):
 
         return output_data
 
+'''
 def main(workspace_root, implementations_root):
     ImplementationsManager.set_workspace_root(workspace_root)
     ImplementationsManager.set_implementations_root(implementations_root)
@@ -464,3 +509,4 @@ if __name__ == "__main__":
         pass
     finally:
         extractor.remove_decorators(program_meta)
+'''
