@@ -159,9 +159,3 @@ class ProjectIndexer:
             subtree.insert_function(function)
 
         return subtree.pretty_print()
-        
-if __name__ == "__main__":
-    # Example usage
-    project_root = "example_project"
-    indexer = ProjectIndexer(project_root)
-    print(indexer.project_tree.pretty_print())
