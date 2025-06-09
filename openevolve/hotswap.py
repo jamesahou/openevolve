@@ -2,7 +2,6 @@ from openevolve.constants import HOTSWAP_ENVVAR, WORKSPACE_ROOT, CONTAINER_IMPS_
 
 from types import FunctionType
 
-import warnings
 import inspect
 import os
 
@@ -26,7 +25,6 @@ def get_implementation(func: FunctionType) -> str:
             "Environment variable 'OPENEVOLE_HOTSWAP_IMP' is not set or is set to '-1'. "
             "Using the original function definition instead."
         )
-        return
         
     imp_name = qualname + " " + implementation_id
     imp_path = os.path.join(CONTAINER_IMPS_PATH, filepath, imp_name)
