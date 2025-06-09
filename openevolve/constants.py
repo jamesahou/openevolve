@@ -6,13 +6,14 @@ HOTSWAP_ENVVAR = "FUNSEARCH_HOTSWAP_IMP"
 
 # Absolute paths in the container file system
 WORKSPACE_ROOT: ContainerAbsPath = Path("/workspace")
-IMPS_CONTAINER_PATH: ContainerAbsPath = Path("/imps")
-LOGS_CONTAINER_PATH: ContainerAbsPath = Path("/logs")
-INPUTS_CONTAINER_PATH: ContainerAbsPath = Path("/inputs")
-EVAL_CONTAINER_PATH: ContainerAbsPath = WORKSPACE_ROOT / "eval.py"
-SETUP_CONTAINER_PATH: ContainerAbsPath = WORKSPACE_ROOT / "setup.py"
-MAIN_CONTAINER_PATH: ContainerAbsPath = "/main.py"
-CONTAINER_PYTHONPATH: ContainerAbsPath = "/usr/local/bin/python3"
+CONTAINER_IMPS_PATH: ContainerAbsPath = Path("/imps")
+CONTAINER_LOGS_PATH: ContainerAbsPath = Path("/logs")
+CONTAINER_INPUTS_PATH: ContainerAbsPath = Path("/inputs")
+CONTAINER_OUTPUTS_PATH: ContainerAbsPath = Path("/outputs")
+CONTAINER_EVAL_PATH: ContainerAbsPath = Path("/eval.py")
+CONTAINER_SETUP_PATH: ContainerAbsPath = Path("/setup.sh")
+CONTAINER_MAIN_PATH: ContainerAbsPath = Path("/main.py")
+CONTAINER_PYTHONPATH: ContainerAbsPath = Path("/usr/local/bin/python3")
 
 # Container constants
 SANDBOX_IMAGE_NAME = "funsearch_image"
