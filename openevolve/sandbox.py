@@ -18,6 +18,8 @@ from openevolve.custom_types import (
     ContainerAbsPath,
 )
 
+from openevolve.eval_result import EvalResult
+
 from enum import StrEnum
 from typing import Any
 
@@ -411,7 +413,7 @@ class ContainerSandbox(DummySandbox):
         implementation_id: str,
         test_id: int,
         timeout: float = 30.0,
-    ) -> Any:
+    ) -> EvalResult:
         """
         Runs the container sandbox with the specified entry point and implementation ID.
 
@@ -421,7 +423,7 @@ class ContainerSandbox(DummySandbox):
             timeout (float): The maximum time in seconds to allow for the function execution.
 
         Returns:
-            Any: The returned output from the evaluator function, run on the test case.
+            EvalResult: The result of the evaluation, containing the output data and exit code.
         """
         output_filepath, retcode = self.execute(implementation_id, test_id, timeout)
 
@@ -439,12 +441,12 @@ class ContainerSandbox(DummySandbox):
 
         # Load the output data from the temporary file
         with open(output_file.name, "rb") as file:
-            output_data = pickle.load(file)
+            eval_result = pickle.load(file)
 
         # Clean up the temporary file
         os.remove(output_file.name)
 
-        return output_data
+        return eval_result
 
 '''
 def main(workspace_root, implementations_root):

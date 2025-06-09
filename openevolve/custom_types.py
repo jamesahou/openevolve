@@ -1,5 +1,5 @@
+from dataclasses import dataclass
 from typing import TypeAlias, Any
-import dataclasses
 from pathlib import Path
 
 # An annotation for full names (relpath + space + qualname)
@@ -13,13 +13,10 @@ HostRelPath: TypeAlias = Path      # This is a relative path inside the project 
 ContainerAbsPath: TypeAlias = Path # This is an absolute path in the container, starting with "/", e.g. "/workspace/.flake8"
 ContainerRelPath: TypeAlias = Path # This is a relative path inside the project in the container, excluding the workspace root (e.g. "./.flake8")
 
-@dataclasses.dataclass
+@dataclass
 class FuncMeta:
-    """
-    Metadata for a function
-    
-    """
-    file_path: Path
+    """Metadata for a function"""
+    file_path: RelPath
     qualname: str
     line_no: int
     class_name: str | None
