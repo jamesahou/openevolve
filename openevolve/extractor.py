@@ -349,44 +349,49 @@ class Extractor:
     def add_decorators(
         self,
         program_meta: dict[FullName, FuncMeta],
-        decorator: str="@openevolve.hotswap",
-        lib: str="openevolve"
+        decorator: str = "@openevolve.hotswap",
+        lib: str = "openevolve"
     ):
         """
         Edit the original file to add the specified decorator to the functions.
         Import openevolve at the top of the file.
+        Handles line number shifting if multiple decorators are added to the same file.
         """
+        # Group by file
+        from collections import defaultdict
+        file_to_funcs = defaultdict(list)
         for fullname, meta in program_meta.items():
-            meta: FuncMeta
-            abs_file_path = self.base_dir / meta.file_path
+            file_to_funcs[meta.file_path].append((fullname, meta))
+
+        for file_path, funcs in file_to_funcs.items():
+            abs_file_path = self.base_dir / file_path
             if not abs_file_path.exists():
                 continue
             with open(abs_file_path, "r") as f:
                 lines = f.readlines()
 
-            # Add the decorator above the function definition
-            line_no = meta.line_no - 1  # Convert to 0-based index
-
-            if meta.class_name:
-                lines[line_no] = f"    {decorator}\n" + lines[line_no]
-            else:
-                lines[line_no] = f"{decorator}\n" + lines[line_no]
+            # Sort by line_no so we insert from top to bottom
+            funcs.sort(key=lambda x: x[1].line_no)
+            offset = 0
+            inserted_lines = set()
+            for fullname, meta in funcs:
+                line_no = meta.line_no - 1 + offset  # Adjust for previous insertions
+                # Prevent double-inserting at the same line (e.g. for nested functions)
+                if line_no in inserted_lines:
+                    continue
+                indent = " " * (len(lines[line_no]) - len(lines[line_no].lstrip()))
+                lines.insert(line_no, f"{indent}{decorator}\n")
+                offset += 1
+                inserted_lines.add(line_no)
 
             # import openevolve under __future__ imports, otherwise at the top of the file
-            has_lib_import = False
-            for line in lines:
-                if f"import {lib}" in line:
-                    has_lib_import = True
-                    break
+            has_lib_import = any(f"import {lib}" in line for line in lines)
             if not has_lib_import:
                 future_import_index = -1
                 for i, line in enumerate(lines):
-                    if line.startswith("from __future__ import") or line.startswith(
-                        "import __future__"
-                    ):
+                    if line.startswith("from __future__ import") or line.startswith("import __future__"):
                         future_import_index = i
                         break
-
                 if future_import_index != -1:
                     lines.insert(future_import_index + 1, f"import {lib}\n")
                 else:
@@ -395,7 +400,7 @@ class Extractor:
             with open(abs_file_path, "w") as f:
                 f.writelines(lines)
 
-            print(f"Added decorator to {abs_file_path} at line {line_no + 1}")
+            print(f"Added decorators to {abs_file_path}")
 
     def remove_decorators(
         self,

@@ -133,11 +133,6 @@ def run(
             evaluator.AsyncEvaluator(
                 database,
                 sbox,
-                template,
-                project_root,
-                eval_file,
-                imps_path,
-                program_meta,
                 tests,
             )
             for _ in range(conf.num_evaluators)
