@@ -6,6 +6,8 @@ from pathlib import Path
 FullName: TypeAlias = str
 
 # Path types
+AbsPath: TypeAlias = Path          # This is an absolute path on some file system
+RelPath: TypeAlias = Path          # This is a relative path inside the project on some file system
 HostAbsPath: TypeAlias = Path      # This is an absolute path on the host (e.g. "/home/user/project/.flake8")
 HostRelPath: TypeAlias = Path      # This is a relative path inside the project on the host, excluding the workspace root (e.g. "./.flake8")
 ContainerAbsPath: TypeAlias = Path # This is an absolute path in the container, starting with "/", e.g. "/workspace/.flake8"

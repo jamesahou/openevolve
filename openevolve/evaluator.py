@@ -73,8 +73,7 @@ class ImplementationsManager:
             function (Function): The function to save.
             id (str): The unique identifier for the implementation.
         """
-        rel_func_path = os.path.relpath(function.path, cls.workspace_root)
-        func_file_path = cls.implementations_root / rel_func_path
+        func_file_path = cls.implementations_root / function.path
         func_code_path = func_file_path / (function.qualname + ' ' + id)
 
         os.makedirs(func_file_path, exist_ok=True)

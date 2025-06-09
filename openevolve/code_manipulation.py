@@ -1,15 +1,14 @@
-from openevolve.structured_outputs import ProgramImplementation
-
-import dataclasses
-import io
-import ast
 import textwrap
-from typing import List, Tuple, Sequence, Any, Dict, Iterable
-import re
-from enum import Enum
-from openevolve.custom_types import FullName, FuncMeta
+import ast
 
-@dataclasses.dataclass
+from typing import Dict, Iterable, List
+from dataclasses import dataclass
+from enum import Enum
+
+from openevolve.structured_outputs import ProgramImplementation
+from openevolve.custom_types import FullName, FuncMeta, RelPath
+
+@dataclass
 class FuncHeader:
     """A parsed Python function header."""
 
@@ -29,23 +28,21 @@ class FuncHeader:
     def __hash__(self):
         return hash(str(self))
 
-
 class Decorator(Enum):
     NONE = ""
     CLASSMETHOD = "classmethod"
     STATICMETHOD = "staticmethod"
     PROPERTY = "property"
 
-@dataclasses.dataclass
+@dataclass
 class Function:
     """A parsed Python function."""
-
     name: str
     header: FuncHeader
     body: str
-    path: str = ""
-    line_no: int = 0
-    qualname: str = ""
+    path: RelPath | None = None
+    qualname: str | None = None
+    line_no: int | None = None
     decorator: Decorator = Decorator.NONE
 
     def __str__(self) -> str:
@@ -79,8 +76,7 @@ class Function:
             value = value.strip("\n")
         super().__setattr__(name, value)
 
-
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class Program:
     """A parsed Python program."""
 
@@ -158,7 +154,6 @@ def _str_to_functions(node: ast.AST, qualname: str = "") -> Iterable[Function]:
                 name=function_node.name,
                 header=header,
                 body=ast.unparse(function_node.body).strip(),
-                path="",  # Path is not available in this context
                 line_no=function_node.lineno,
                 qualname=(qualname + '.' + function_node.name)[1:],
                 decorator=decorator
@@ -235,7 +230,7 @@ def structured_output_to_prog_meta(
     
     # Set the metadata for each function
     for func in functions.values():
-        meta = program_meta[func.path + ' ' + func.qualname]
+        meta = program_meta[str(func.path) + ' ' + func.qualname]
         func.line_no = meta.line_no
         func.qualname = meta.qualname
 

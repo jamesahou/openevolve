@@ -48,15 +48,12 @@ class FunctionNode(Node):
         return self.function.name + '(' + ', '.join(self.function.header.args) + ')'
 
 class ProjectTree:
-    def __init__(self, workspace_path: str | None = None):
+    def __init__(self):
         self.tree = FolderNode("project")
-        self.workspace_path = workspace_path
 
     def insert_function(self, function: Function) -> FunctionNode:
         # Parse the relative path of the function
-        relpath = os.path.relpath(function.path, self.workspace_path) if self.workspace_path else function.path
-
-        path_parts = relpath.split(os.sep)
+        path_parts = function.path.split(os.sep)
         qual_parts = function.qualname.split('.')
         
         # Start at the root of the tree
@@ -133,7 +130,7 @@ class ProjectTree:
 
 class ProjectIndexer:
     @classmethod
-    def get_tree_description(cls, program: Program, workspace_path: str | None = None) -> str:
+    def get_tree_description(cls, program: Program) -> str:
         """
         Returns an indented string representation of the project structure,
         including modules, classes, methods, and functions, as specified.
@@ -156,7 +153,7 @@ class ProjectIndexer:
             └── main()
         """
         # Build a subtree of the project tree for the given program
-        subtree = ProjectTree(workspace_path)
+        subtree = ProjectTree()
 
         for function in program.functions:
             subtree.insert_function(function)

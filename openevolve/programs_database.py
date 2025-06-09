@@ -295,7 +295,7 @@ class Island:
         prompt += f"# This is an improved version of the previous program (*_v{program_version - 1})\n\n"
 
       for function in implementation.functions:
-        path = pathlib.Path(function.path).relative_to(self.workspace)
+        path = function.path
         func_loc_comment = f"#{path}: {function.qualname} ({function.decorator if function.decorator else ''}\n)"
         prompt += f"{func_loc_comment}\n"
 
