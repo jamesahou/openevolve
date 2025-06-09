@@ -85,7 +85,6 @@ class ProgramsDatabase:
         self,
         config: config_lib.ProgramsDatabaseConfig,
         template: code_manipulation.Program,
-        worskpace: pathlib.Path,
         identifier: str = "",
     ) -> None:
         self._config: config_lib.ProgramsDatabaseConfig = config
@@ -95,7 +94,6 @@ class ProgramsDatabase:
         self._program_counter = 0
         self._backups_done = 0
         self.identifier = identifier
-        self.workspace = worskpace
 
         self._file_hierarchy = ProjectIndexer.get_tree_description(self._template)
 
@@ -109,7 +107,6 @@ class ProgramsDatabase:
                     config.functions_per_prompt,
                     config.cluster_sampling_temperature_init,
                     config.cluster_sampling_temperature_period,
-                    self.workspace,
                 )
             )
         self._best_score_per_island: list[float] = [-float("inf")] * config.num_islands
@@ -227,7 +224,6 @@ class ProgramsDatabase:
                 self._config.functions_per_prompt,
                 self._config.cluster_sampling_temperature_init,
                 self._config.cluster_sampling_temperature_period,
-                self.workspace,
             )
             self._best_score_per_island[island_id] = -float("inf")
             founder_island_id = np.random.choice(keep_islands_ids)
@@ -246,7 +242,6 @@ class Island:
         functions_per_prompt: int,
         cluster_sampling_temperature_init: float,
         cluster_sampling_temperature_period: int,
-        workspace: pathlib.Path,
     ) -> None:
         self._template: code_manipulation.Program = template
         self._file_hierarchy = file_hierarchy
@@ -256,7 +251,6 @@ class Island:
 
         self._clusters: dict[Signature, Cluster] = {}
         self._num_programs: int = 0
-        self.workspace = workspace
 
     def register_program(
         self,

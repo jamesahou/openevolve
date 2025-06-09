@@ -69,8 +69,8 @@ def run(project_root, setup_file, eval_file, tests_file, evolve_depth, model_nam
   
   ex:extractor.Extractor = extractor.Extractor(project_root, eval_file)
   
-  initial_program, path, program_meta = ex.run(tests[0], evolve_depth)
-  if path is None:
+  initial_program, evolve_path, program_meta = ex.run(tests[0], evolve_depth)
+  if evolve_path is None:
     raise ValueError("No initial program found. Make sure that the eval_file is correct and contains a valid program.")
   
   template = code_manipulation.structured_output_to_prog_meta(initial_program, program_meta)
@@ -78,7 +78,7 @@ def run(project_root, setup_file, eval_file, tests_file, evolve_depth, model_nam
   try:
     conf = config.Config(num_evaluators=1)
     database = programs_database.ProgramsDatabase(
-      conf.programs_database, template, worskpace=workspace, identifier=timestamp)
+      conf.programs_database, template, worskpace=project_root, identifier=timestamp)
     if load_backup:
       database.load(load_backup)
 
