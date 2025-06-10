@@ -10,6 +10,7 @@ from openevolve.constants import (
     CONTAINER_INPUTS_PATH,
     CONTAINER_OUTPUTS_PATH,
     CONTAINER_IMPS_PATH,
+    CONTAINER_OPENEVOLVE_EDITABLE_PATH,
     CONTAINER_PYTHONPATH,
 )
 
@@ -21,13 +22,12 @@ from openevolve.custom_types import (
 
 from openevolve.eval_result import EvalResult
 
+from pathlib import Path
 from enum import StrEnum
-from typing import Any
 
 import cloudpickle as pickle
 import tempfile
 import logging
-import pathlib
 import shutil
 import sys
 import os
@@ -68,6 +68,7 @@ class ContainerSandbox(DummySandbox):
         imps_root: HostAbsPath,
         eval_relpath: HostRelPath,
         setup_relpath: HostRelPath | None = None,
+        openevolve_path: HostAbsPath | None = None,
         force_rebuild_container: bool = False,
         pythonpath: ContainerAbsPath = CONTAINER_PYTHONPATH,
     ):
@@ -79,6 +80,7 @@ class ContainerSandbox(DummySandbox):
             imps_root (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
             eval_relpath (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
             setup_relpath (HostRelPath | None): The path to the setup file for installation on the host, relative to the project root (e.g. "./setup.sh"). If provided, must be a shell script.
+            openevolve_path (HostAbsPath | None): The absolute path to the OpenEvolve library on the host. If provided, it will be mounted in the container instead of cloned from the repository.
             force_rebuild_container (bool): If True, forces the rebuild of the container, even if it already exists.
             pythonpath (ContainerAbsPath): The absolute path to the Python interpreter to use on the host. Defaults to `CONTAINER_PYTHONPATH`.
         """
@@ -88,6 +90,7 @@ class ContainerSandbox(DummySandbox):
         self.imps_root = imps_root
         self.eval_relpath = eval_relpath
         self.setup_relpath = setup_relpath
+        self.openevolve_path = openevolve_path
         self.pythonpath = pythonpath
 
         eval_abspath = project_root / eval_relpath
@@ -169,6 +172,7 @@ class ContainerSandbox(DummySandbox):
         project_root: HostAbsPath,
         eval_relpath: HostRelPath,
         setup_relpath: HostAbsPath | None = None,
+        editable: bool = False,
     ):
         """
         Builds the container image.
@@ -177,6 +181,7 @@ class ContainerSandbox(DummySandbox):
             project_root (HostAbsPath): The absolute path to the project root on the host.
             eval_relpath (HostRelPath): The path to the evaluation entry point on the host, relative to the project root (e.g. "./eval.py").
             setup_relpath (HostAbsPath | None): The absolute path to the setup file for installation, located on the host. If provided, must be a shell script.
+            editable (bool): If True, mounts the open-evolve library to the container rather than cloning it from the repository.
         """
         version = sys.version.split(" ")[0]
         logging.debug(f"Using Python version: {version}")
@@ -185,7 +190,7 @@ class ContainerSandbox(DummySandbox):
         cls.select_engine()
 
         # Define the path to the Dockerfile
-        dockerfile = pathlib.Path(__file__).parent / "container" / "Dockerfile"
+        dockerfile = Path(__file__).parent / "container" / "Dockerfile"
         logging.debug("Building container image")
 
         # Add the setup file as a build argument if provided
@@ -207,6 +212,8 @@ class ContainerSandbox(DummySandbox):
             f"--build-arg PROJECT_ROOT=. "
             # Set the build argument for the evaluation entry point
             f"--build-arg EVAL_RELPATH={eval_relpath} "
+            # Set the build argument for editable mode
+            f"--build-arg EDITABLE={'1' if editable else '0'} "
             # Tag the image with the name
             f"-t {SANDBOX_IMAGE_NAME} "
             # Use the Dockerfile from the container directory
@@ -226,27 +233,40 @@ class ContainerSandbox(DummySandbox):
             )
 
     @classmethod
-    def create_container(cls, imps_root: HostAbsPath):
+    def create_container(cls, imps_root: HostAbsPath, openevolve_path: HostAbsPath | None = None):
         """
         Creates a container from the built image.
         
         Args:
             imps_root (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+            openevolve_path (HostAbsPath | None): The absolute path to the OpenEvolve library on the host. If provided, it will be mounted in the container.
         """
         # Create the container
         logging.debug("Creating container from the built image...")
-        
+
+        # Mount the implementations directory from the host to /implementations in the container
+        mounts = [(imps_root, CONTAINER_IMPS_PATH, "readonly")]
+
+        is_editable = openevolve_path is not None
+
+        if is_editable:
+            # If the OpenEvolve library path is provided, mount it in the container
+            mounts.append((openevolve_path / "openevolve", CONTAINER_OPENEVOLVE_EDITABLE_PATH / "openevolve", "readonly"))
+            mounts.append((openevolve_path / "pyproject.toml", CONTAINER_OPENEVOLVE_EDITABLE_PATH / "pyproject.toml", "readonly"))
+
         cmd = (
             f"{cls.executable} create "
             # Set the container to run in interactive mode
             f"-i "
             # Set the container name
             f"--name {SANDBOX_CONTAINER_NAME} "
-            # Mount the implementations directory from the host to /implementations in the container
-            f"--mount type=bind,source={imps_root},target={CONTAINER_IMPS_PATH},readonly "
-            # Use the built image
-            f"{SANDBOX_IMAGE_NAME}:latest"
         )
+
+        for source, target, mode in mounts:
+            cmd += f"--mount type=bind,source={source},target={target},mode={mode} "
+
+        # Use the built image
+        cmd += f"{SANDBOX_IMAGE_NAME}:latest"
 
         logging.debug(f"Executing: {cmd}")
         retcode = os.system(cmd)
@@ -256,6 +276,25 @@ class ContainerSandbox(DummySandbox):
                 f"Failed to create the container {SANDBOX_CONTAINER_NAME}. "
                 "Please check the container engine and the image."
             )
+
+        if is_editable:
+            # Install OpenEvolve in editable mode
+            logging.debug("Installing OpenEvolve in editable mode...")
+
+            cmd = (
+                f"{cls.executable} exec "
+                f"{SANDBOX_CONTAINER_NAME} "
+                f"{CONTAINER_PYTHONPATH} -m pip install -e {CONTAINER_OPENEVOLVE_EDITABLE_PATH}"
+            )
+
+            logging.debug(f"Executing: {cmd}")
+            retcode = os.system(cmd)
+            
+            if retcode != 0:
+                raise RuntimeError(
+                    f"Failed to install OpenEvolve in editable mode in the container {SANDBOX_CONTAINER_NAME}. "
+                    "Please check the container engine and the OpenEvolve path."
+                )
 
         # Complete the image build process
         logging.debug("Container image built successfully.")

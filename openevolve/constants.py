@@ -15,6 +15,8 @@ CONTAINER_OUTPUTS_PATH: ContainerAbsPath = Path("/home/outputs")
 CONTAINER_EVAL_PATH: ContainerAbsPath = Path("/home/eval.py")
 CONTAINER_SETUP_PATH: ContainerAbsPath = Path("/home/setup.sh")
 CONTAINER_MAIN_PATH: ContainerAbsPath = Path("/home/main.py")
+CONTAINER_OPENEVOLVE_PATH: ContainerAbsPath = Path("/home/openevolve")
+CONTAINER_OPENEVOLVE_EDITABLE_PATH: ContainerAbsPath = Path("/home/openevolve_editable")
 CONTAINER_PYTHONPATH: ContainerAbsPath = Path("/usr/local/bin/python3")
 
 # Container constants

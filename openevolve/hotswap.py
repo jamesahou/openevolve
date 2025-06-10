@@ -45,7 +45,7 @@ def hotswap(func: FunctionType):
     implementation = get_implementation(func)
 
     def wrapper(*args, **kwargs):
-        func_code = f"def _dynamic_func(self):\n"
+        func_code = f"def _dynamic_func(*args, **kwargs):\n"
         for line in implementation.splitlines():
             func_code += "    " + line + "\n"
         local_vars = {}
@@ -85,7 +85,6 @@ def apply_decorator(
 ):
     """Apply a decorator to a function defined in a specific file."""
     for node, node_qualname in qualwalk(tree):
-        #print(node_qualname, qualname)
         if isinstance(node, ast.FunctionDef) and node_qualname == qualname:
             node.decorator_list.append(ast.Name(id=decorator, ctx=ast.Load()))
 

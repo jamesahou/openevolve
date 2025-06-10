@@ -33,6 +33,8 @@ ARG PROJECT_ROOT
 ARG SETUP_RELPATH
 # The evaluation entry point script
 ARG EVAL_RELPATH
+# Whether the installation of OpenEvolve is editable or not
+ARG EDITABLE
 
 COPY ${PROJECT_ROOT} /home/workspace
 COPY ${SETUP_RELPATH} /home/setup.sh
@@ -50,14 +52,16 @@ RUN git clone https://gist.github.com/93919a6ff1fe629b94ebc8c67a747059.git /home
 RUN mv /home/openevolve_gists/openevolve_sandbox_main.py /home/main.py
 RUN rm -rf /home/openevolve_gists
 
-# Clone the OpenEvolve repository
-RUN git clone https://github.com/jamesahou/openevolve.git /home/openevolve
-
-# Install OpenEvolve
-RUN cd /home/openevolve && \
-    pip install .
-
-RUN rm -rf /home/openevolve/
+# If editable mode is disabled, install OpenEvolve in non-editable mode
+RUN if [ "$EDITABLE" = "0" ]; then \
+        echo "Installing OpenEvolve in non-editable mode. Cloning from the repository..." && \
+        git clone https://github.com/jamesahou/openevolve.git /home/openevolve && \
+        cd /home/openevolve && \
+        pip install . && \
+        rm -rf /home/openevolve/
+    else \
+        mkdir /home/openevolve_editable
+    fi
 
 RUN mkdir /home/inputs
 RUN mkdir /home/outputs
