@@ -15,6 +15,8 @@ class NoImplementationSpecified(Exception):
 def get_relative_path(func: FunctionType, root: AbsPath) -> str:
     """Get the file path of the provided function relative to the project root."""
     absolute_path = inspect.getfile(func)
+    print(func.__qualname__)
+    print(absolute_path, root)
     relative_path = str(Path(absolute_path).relative_to(root))
     return relative_path
 
@@ -91,19 +93,23 @@ def apply_decorator(
 def remove_decorator(
     tree: ast.Module,
     qualname: str,
-    decorator: str = "openevolve.hotswap",
 ):
     """Remove a specific decorator from a function in the AST."""
     for node, node_qualname in qualwalk(tree):
         if isinstance(node, ast.FunctionDef) and node_qualname == qualname:
-            node.decorator_list = [
-                d for d in node.decorator_list if not isinstance(d, ast.Name) or d.id != decorator
-            ]
+            new_decorator_list = []
+
+            for decorator in node.decorator_list:
+                if isinstance(decorator, ast.Attribute) and decorator.value.id == "openevolve" and decorator.attr == "hotswap":
+                    continue  # Skip the decorator we want to remove
+                new_decorator_list.append(decorator)
+                
+            node.decorator_list = new_decorator_list
 
 def does_import_openevolve(tree: ast.Module) -> bool:
     """Check if an absolute import statement for openevolve exists as a child of the root of the AST."""
     for node in tree.body:
-        if isinstance(node, ast.Import) and len(node.names) == 1 and node.names[0] == LIBRARY_NAME:
+        if isinstance(node, ast.Import) and len(node.names) == 1 and node.names[0].name == LIBRARY_NAME:
             return True
     return False
 
@@ -126,6 +132,6 @@ def import_openevolve(tree: ast.Module):
 def unimport_openevolve(tree: ast.Module):
     """Remove the absolute import statement of openevolve from the top level of the AST."""
     for node in tree.body:
-        if isinstance(node, ast.Import) and len(node.names) == 1 and node.names[0] == LIBRARY_NAME:
+        if isinstance(node, ast.Import) and len(node.names) == 1 and node.names[0].name == LIBRARY_NAME:
             tree.body.remove(node)
             break

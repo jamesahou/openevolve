@@ -392,7 +392,7 @@ class Extractor:
             unimport_openevolve(file_ast)
                 
             for qualname in qualnames:
-                remove_decorator(file_ast, qualname, decorator)
+                remove_decorator(file_ast, qualname)
 
             with open(self.base_dir / fpath, 'w') as f:
                 f.write(ast.unparse(file_ast))
