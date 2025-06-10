@@ -87,7 +87,7 @@ def apply_decorator(
     for node, node_qualname in qualwalk(tree):
         #print(node_qualname, qualname)
         if isinstance(node, ast.FunctionDef) and node_qualname == qualname:
-            node.decorator_list.insert(0, ast.Name(id=decorator, ctx=ast.Load()))
+            node.decorator_list.append(ast.Name(id=decorator, ctx=ast.Load()))
 
 def remove_decorator(
     tree: ast.Module,
