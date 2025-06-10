@@ -127,13 +127,20 @@ class ContainerSandbox(DummySandbox):
                 project_root,
                 eval_relpath,
                 setup_relpath,
+                editable = openevolve_path is not None,
             )
 
             # Create the container from the built image
-            self.create_container(imps_root)
+            self.create_container(imps_root, openevolve_path)
 
         # Start the container if it is not already running
         self.start_container()
+
+        is_editable = openevolve_path is not None
+        
+        if is_editable:
+            # If the OpenEvolve library path is provided, install it in editable mode
+            self.install_editable_openevolve()
 
     @staticmethod
     def has_engine(engine: ContainerEngine) -> bool:
@@ -263,7 +270,7 @@ class ContainerSandbox(DummySandbox):
         )
 
         for source, target, mode in mounts:
-            cmd += f"--mount type=bind,source={source},target={target},mode={mode} "
+            cmd += f"--mount type=bind,source={source},target={target},{mode} "
 
         # Use the built image
         cmd += f"{SANDBOX_IMAGE_NAME}:latest"
@@ -277,27 +284,29 @@ class ContainerSandbox(DummySandbox):
                 "Please check the container engine and the image."
             )
 
-        if is_editable:
-            # Install OpenEvolve in editable mode
-            logging.debug("Installing OpenEvolve in editable mode...")
-
-            cmd = (
-                f"{cls.executable} exec "
-                f"{SANDBOX_CONTAINER_NAME} "
-                f"{CONTAINER_PYTHONPATH} -m pip install -e {CONTAINER_OPENEVOLVE_EDITABLE_PATH}"
-            )
-
-            logging.debug(f"Executing: {cmd}")
-            retcode = os.system(cmd)
-            
-            if retcode != 0:
-                raise RuntimeError(
-                    f"Failed to install OpenEvolve in editable mode in the container {SANDBOX_CONTAINER_NAME}. "
-                    "Please check the container engine and the OpenEvolve path."
-                )
-
         # Complete the image build process
         logging.debug("Container image built successfully.")
+
+    def install_editable_openevolve(cls):
+        # Install OpenEvolve in editable mode
+        logging.debug("Installing OpenEvolve in editable mode...")
+
+        cmd = (
+            f"{cls.executable} exec "
+            f"{SANDBOX_CONTAINER_NAME} "
+            f"{CONTAINER_PYTHONPATH} -m pip install -e {CONTAINER_OPENEVOLVE_EDITABLE_PATH}"
+        )
+
+        logging.debug(f"Executing: {cmd}")
+        retcode = os.system(cmd)
+
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to install OpenEvolve in editable mode in the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine and the OpenEvolve path."
+            )
+        
+        logging.debug("OpenEvolve installed in editable mode successfully.")
 
     @classmethod
     def upload_test_cases(cls, test_cases: list[TestCase]):

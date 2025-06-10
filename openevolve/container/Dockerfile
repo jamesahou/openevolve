@@ -58,9 +58,9 @@ RUN if [ "$EDITABLE" = "0" ]; then \
         git clone https://github.com/jamesahou/openevolve.git /home/openevolve && \
         cd /home/openevolve && \
         pip install . && \
-        rm -rf /home/openevolve/
+        rm -rf /home/openevolve/ \
     else \
-        mkdir /home/openevolve_editable
+        mkdir /home/openevolve_editable; \
     fi
 
 RUN mkdir /home/inputs

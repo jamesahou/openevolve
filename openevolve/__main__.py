@@ -93,6 +93,7 @@ def run(
     setup_file: HostRelPath = pathlib.Path(setup_file)
     eval_file: HostRelPath = pathlib.Path(eval_file)  # relative to project_root
     tests_file: HostAbsPath = pathlib.Path(tests_file)
+    openevolve_path: HostAbsPath = pathlib.Path(__file__).parent.parent
 
     assert project_root.is_absolute()
     assert not setup_file.is_absolute()
@@ -141,7 +142,7 @@ def run(
             database.load(load_backup)
 
         sbox = sandbox.ContainerSandbox(
-            project_root, imps_path, eval_file, setup_file, force_rebuild_container = True
+            project_root, imps_path, eval_file, setup_file, openevolve_path = openevolve_path,# force_rebuild_container = True
         )
         evaluators = [
             evaluator.Evaluator(
