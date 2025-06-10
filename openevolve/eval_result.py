@@ -7,3 +7,4 @@ class EvalResult:
     timeout: bool
     success: bool
     output: Any
+    err: str | None

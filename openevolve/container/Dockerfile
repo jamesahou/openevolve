@@ -38,13 +38,12 @@ ARG EDITABLE
 
 COPY ${PROJECT_ROOT} /home/workspace
 COPY ${SETUP_RELPATH} /home/setup.sh
-COPY ${EVAL_RELPATH} /home/eval.py
 
 # Install git
 RUN apt-get update && \
     apt-get install -y git
 
-    # Upgrade pip to the latest version
+# Upgrade pip to the latest version
 RUN pip install --upgrade pip
 
 # Clone the main entry point gist
@@ -63,12 +62,15 @@ RUN if [ "$EDITABLE" = "0" ]; then \
         mkdir /home/openevolve_editable; \
     fi
 
+# Create directories for inputs, outputs, and logs
 RUN mkdir /home/inputs
 RUN mkdir /home/outputs
 RUN mkdir /home/logs
 
+# Enter the workspace directory
 WORKDIR /home/workspace
 
+# Run the setup script if provided
 RUN if [ -z "$SETUP_RELPATH" ]; then \
         echo "No setup file provided."; \
     else \

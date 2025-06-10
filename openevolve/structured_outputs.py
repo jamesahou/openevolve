@@ -4,7 +4,7 @@ import dataclasses
 
 class FunctionImplementation(BaseModel):
     """
-    Represents the implementation details of a function.
+    Represents the implementation details of a single function.
     """
     filepath: str = Field(
         description="The path to the file containing the function implementation."
@@ -13,7 +13,7 @@ class FunctionImplementation(BaseModel):
         description="The qualified name of the function. DO NOT INCLUDE THE VERSION SUFFIX."
     )
     code: str = Field(
-        description="The source code of the function implementation, including the header and body."
+        description="The source code of a single function implementation, including the header and body."
     )
 
 class ProgramImplementation(BaseModel):

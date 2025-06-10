@@ -49,6 +49,12 @@ def main(ctx):
 @click.argument("eval_file", type=click.Path(file_okay=True))
 @click.argument("tests_file", type=click.Path(file_okay=True))
 @click.option(
+    "--prompt",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="A project-specific prompt file to use for the LLM",
+)
+@click.option(
     "--evolve_depth",
     default=-1,
     type=click.INT,
@@ -71,17 +77,20 @@ def main(ctx):
     "--iterations", default=-1, type=click.INT, help="Max iterations per sampler"
 )
 @click.option("--samplers", default=15, type=click.INT, help="Samplers")
+@click.option("--evaluators", default=15, type=click.INT, help="Evaluators")
 def run(
     project_root,
     setup_file,
     eval_file,
     tests_file,
+    prompt,
     evolve_depth,
     model_name,
     output_path,
     load_backup,
     iterations,
     samplers,
+    evaluators,
 ):
     timestamp = str(int(time.time()))
     log_path: HostAbsPath = pathlib.Path(output_path) / timestamp
@@ -94,6 +103,14 @@ def run(
     eval_file: HostRelPath = pathlib.Path(eval_file)  # relative to project_root
     tests_file: HostAbsPath = pathlib.Path(tests_file)
     openevolve_path: HostAbsPath = pathlib.Path(__file__).parent.parent
+    prompt_path: HostAbsPath = pathlib.Path(prompt) if prompt else None
+
+    # Load the extra prompt if provided
+    if prompt_path is None:
+        extra_prompt = None
+    else:
+        with open(prompt_path, "r") as f:
+            extra_prompt = f.read()
 
     assert project_root.is_absolute()
     assert not setup_file.is_absolute()
@@ -111,21 +128,37 @@ def run(
 
     eval_file = pathlib.Path(eval_file)
 
-    ex: extractor.Extractor = extractor.Extractor(project_root, eval_file)
+    ex = extractor.Extractor(project_root, eval_file)
 
-    #initial_program, path, program_meta = ex.run(tests[0], evolve_depth)
-    #if path is None:
-    #    raise ValueError(
-    #        "No initial program found. Make sure that the eval_file is correct and contains a valid program."
-    #    )
+    initial_program, path, program_meta = ex.run(tests[0], evolve_depth)
+    if path is None:
+        raise ValueError(
+            "No initial program found. Make sure that the eval_file is correct and contains a valid program."
+        )
 
     # Load initial_program and program_meta from the cache directoy
     cache_dir = pathlib.Path(__file__).parent.parent / "cache"
 
-    with open(cache_dir / "spec_structured.pickle", "rb") as f:
+    """
+    with open(cache_dir / "circle_packing_spec_structured.pickle", "wb") as f:
+        cloudpickle.dump(initial_program, f)
+
+    with open(cache_dir / "circle_packing_program_meta.pickle", "wb") as f:
+        cloudpickle.dump(program_meta, f)
+    """
+
+    """
+    with open(cache_dir / "circle_packing_spec_structured.pickle", "rb") as f:
         initial_program: extractor.ProgramImplementation = cloudpickle.load(f)
-    with open(cache_dir / "program_meta.pickle", "rb") as f:
+
+    with open(cache_dir / "circle_packing_program_meta.pickle", "rb") as f:
         program_meta: dict[str, extractor.FuncMeta] = cloudpickle.load(f)
+    """
+
+    # with open(cache_dir / "spec_structured.pickle", "rb") as f:
+    #    initial_program: extractor.ProgramImplementation = cloudpickle.load(f)
+    # with open(cache_dir / "program_meta.pickle", "rb") as f:
+    #    program_meta: dict[str, extractor.FuncMeta] = cloudpickle.load(f)
 
     ImplementationsManager.set_workspace_root(project_root)
     ImplementationsManager.set_implementations_root(imps_path)
@@ -134,18 +167,29 @@ def run(
     template = code_manipulation.structured_output_to_prog_meta(
         initial_program, program_meta, 0
     )
+
     ex.add_decorators(program_meta)
 
     try:
-        conf = config.Config(num_evaluators=1)
+        programs_database_conf = config.ProgramsDatabaseConfig(num_islands=5)
+        conf = config.Config(num_evaluators = evaluators, programs_database = programs_database_conf)
+
         database = programs_database.ProgramsDatabase(
-            conf.programs_database, template, identifier=timestamp
+            config=conf.programs_database,
+            template=template,
+            extra_prompt=extra_prompt,
+            identifier=timestamp,
         )
+
         if load_backup:
             database.load(load_backup)
 
         sbox = sandbox.ContainerSandbox(
-            project_root, imps_path, eval_file, setup_file, openevolve_path = openevolve_path,# force_rebuild_container = True
+            project_root,
+            imps_path,
+            eval_file,
+            setup_file,
+            openevolve_path=openevolve_path,  # force_rebuild_container = True
         )
         evaluators = [
             evaluator.Evaluator(
@@ -156,7 +200,12 @@ def run(
             for _ in range(conf.num_evaluators)
         ]
         # We send the initial implementation to be analysed by one of the evaluators.
-        evaluators[0].analyse(initial_program, 0, island_id=None, implementation_id="0",)
+        evaluators[0].analyse(
+            initial_program,
+            0,
+            island_id=None,
+            implementation_id="0",
+        )
         assert len(database._islands[0]._clusters) > 0, (
             "Initial analysis failed. Make sure that Sandbox works! "
             "See e.g. the error files under sandbox data."
@@ -165,8 +214,11 @@ def run(
         lm = sampler.vLLM(
             samples_per_prompt=2,
             url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            model="gemini-2.0-flash-lite",
+            model="gemini-2.0-flash",
             log_path=log_path,
+            top_p=0.95,
+            temperature=0.7,
+            max_tokens=8192,
         )
 
         samplers = [
@@ -176,7 +228,7 @@ def run(
         core.run(samplers, database, iterations)
     finally:
         ex.remove_decorators(program_meta)
-        #if os.path.exists(imps_path):
+        # if os.path.exists(imps_path):
         #    shutil.rmtree(imps_path)
 
 

@@ -1,8 +1,8 @@
 from openevolve.project_indexer import ProjectIndexer
 from openevolve.code_manipulation import Program
 
+from dataclasses import dataclass
 from pathlib import Path
-import ast
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -40,19 +40,53 @@ project/foo/bar.py: BarParent.BarClass.bar_method_v2
 ```
 """
 
-PROMPT_HEADER_TEMPLATE = """
-### ROLE ###
-{role}
+TASK_PROMPT_TEMPLATE = """
+The user has provided you some special information to help you understand the context of the code you will be working on. Read the following carefully and use it to inform your work. The message from the user is enclosed in triple backticks below:
 
-### GUIDELINES ###
-{guidelines}
-3. YOUR FUNCTION NAMES (IN YOUR CODE) MUST END WITH THE SUFFIX "_v{num_versions}"
-4. YOUR QUALNAME MUST NOT INCLUDE THE VERSION SUFFIX
-5. YOUR QUALNAME MUST BE COMPLETE, AS SHOWN IN THE PREVIOUS VERSIONS
-
-### FILE HIERARCHY ###
-{file_hierarchy}
+```
+{task}
+```
 """.strip()
+
+@dataclass
+class PromptSection:
+    """
+    Represents a section of the prompt.
+    
+    Attributes:
+        title (str): The title of the section.
+        content (str): The content of the section.
+    """
+    title: str
+    content: str
+
+def compose_prompt(sections: list[PromptSection]) -> str:
+    """
+    Compose a prompt from multiple sections.
+    
+    Args:
+        sections (list[PromptSection]): A list of sections to include in the prompt.
+        
+    Returns:
+        str: The composed prompt string.
+    """
+    prompt = ""
+    for section in sections:
+        prompt += f"### {section.title.upper()} ###\n{section.content}\n\n"
+    return prompt.rstrip()
+
+def get_role_prompt(role: str) -> PromptSection:
+    return PromptSection(title="ROLE", content=role)
+
+def get_task_prompt(task: str) -> PromptSection:
+    prompt_text = TASK_PROMPT_TEMPLATE.format(task=task)
+    return PromptSection(title="TASK", content=prompt_text)
+
+def get_guidelines_prompt(guidelines: str) -> PromptSection:
+    return PromptSection(title="GUIDELINES", content=guidelines)
+
+def get_file_hierarchy_prompt(file_hierarchy: str) -> PromptSection:
+    return PromptSection(title="FILE HIERARCHY", content=file_hierarchy)
 
 def load_prompt(filepath: Path) -> str:
     """
@@ -71,7 +105,12 @@ ROLE_PROMPT = load_prompt(PROMPTS_DIR / "role.txt")
 GUIDELINES_PROMPT = load_prompt(PROMPTS_DIR / "guidelines.txt")
 RESPONSE_FORMAT_PROMPT = load_prompt(PROMPTS_DIR / "response_format.txt")
 
-def build_prompt(programs: list[Program], file_hierarchy: str, num_versions: int) -> str:
+def build_prompt(
+    programs: list[Program],
+    file_hierarchy: str,
+    num_versions: int,
+    extra_prompt: str | None = None,
+) -> str:
     """
     Build a prompt for the LLM based on the provided program structure.
     
@@ -79,18 +118,27 @@ def build_prompt(programs: list[Program], file_hierarchy: str, num_versions: int
         programs (list[Program]): The program structures containing functions and their metadata.
         file_hierarchy (str): A string representation of the file hierarchy.
         num_versions (int): The number of versions of the program.
+        extra_prompt (str | None): Additional prompt text to append to the main prompt.
 
     Returns:
         str: The formatted prompt string.
     """
-    prompt = PROMPT_HEADER_TEMPLATE.format(
-        role=ROLE_PROMPT,
-        guidelines=GUIDELINES_PROMPT,
-        response_format=RESPONSE_FORMAT_PROMPT,
-        file_hierarchy=file_hierarchy,
-        num_versions=num_versions,
-    )
-    
+    # Get the prompt sections
+    sections = [
+        get_role_prompt(ROLE_PROMPT),
+    ]
+
+    if extra_prompt:
+        sections.append(get_task_prompt(extra_prompt))
+
+    guidelines_prompt_text = GUIDELINES_PROMPT.format(num_versions=num_versions)
+    sections.append(get_guidelines_prompt(guidelines_prompt_text))
+
+    sections.append(get_file_hierarchy_prompt(file_hierarchy))
+
+    # Compose the main prompt
+    prompt = compose_prompt(sections)
+
     for program_id, program in enumerate(programs):
         prompt += f"\n\n### START OF PROGRAM VERSION {program_id} (*_v{program_id}) ###\n"
         

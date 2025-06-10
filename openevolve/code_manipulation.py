@@ -302,5 +302,6 @@ def structured_output_to_prog_meta(
         meta = program_meta[str(func.path) + ' ' + func.qualname]
         func.line_no = meta.line_no
         func.qualname = meta.qualname
+        func.header = header_from_str(meta.header)
 
     return Program(functions=list(functions.values()))

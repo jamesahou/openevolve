@@ -24,7 +24,7 @@ CACHE_DIR = Path(__file__).parent.parent / "cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 def test_extractor():
-    project_root: HostAbsPath = Path("/Users/ryanrudes/GitHub/OpenEvolve/astropy")
+    project_root: HostAbsPath = Path("/Users/ryanrudes/GitHub/OpenEvolve/circle_packing")
     eval_path: HostRelPath = Path("./eval.py")
 
     test_case = TestCase(
@@ -39,26 +39,26 @@ def test_extractor():
 
     spec_structured, path, program_meta = extactor.run(test_case)
 
-    with open(CACHE_DIR / "spec_structured.pickle", "wb") as f:
+    with open(CACHE_DIR / "circle_packing_spec_structured.pickle", "wb") as f:
         pickle.dump(spec_structured, f)
 
-    with open(CACHE_DIR / "program_meta.pickle", "wb") as f:
+    with open(CACHE_DIR / "circle_packing_program_meta.pickle", "wb") as f:
         pickle.dump(program_meta, f)
 
 def test_call_tree():
-    with open(CACHE_DIR / "spec_structured.pickle", "rb") as f:
+    with open(CACHE_DIR / "circle_packing_spec_structured.pickle", "rb") as f:
         spec_structured: ProgramImplementation = pickle.load(f)
 
-    with open(CACHE_DIR / "program_meta.pickle", "rb") as f:
+    with open(CACHE_DIR / "circle_packing_program_meta.pickle", "rb") as f:
         program_meta: dict[str, FuncMeta] = pickle.load(f)
 
-    program = code_manipulation.structured_output_to_prog_meta(spec_structured, program_meta)
+    program = code_manipulation.structured_output_to_prog_meta(spec_structured, program_meta, 0)
     file_hierarchy = ProjectIndexer.get_tree_description(program)
 
-    with open(CACHE_DIR / "program.pickle", "wb") as f:
+    with open(CACHE_DIR / "circle_packing_program.pickle", "wb") as f:
         pickle.dump(program, f)
 
-    with open(CACHE_DIR / "file_hierarchy.txt", "w") as f:
+    with open(CACHE_DIR / "circle_packing_file_hierarchy.txt", "w") as f:
         f.write(file_hierarchy)
 
     print()
@@ -67,18 +67,50 @@ def test_call_tree():
     print("======================")
     
 def test_prompt_builder():
-    with open(CACHE_DIR / "program.pickle", "rb") as f:
+    with open(CACHE_DIR / "circle_packing_program.pickle", "rb") as f:
         program: ProgramImplementation = pickle.load(f)
 
-    prompt = build_prompt(program)
+    file_hierarchy = ProjectIndexer.get_tree_description(program)
+
+    prompt = build_prompt(
+        programs = [program],
+        file_hierarchy = file_hierarchy,
+        num_versions = 1,
+        extra_prompt=None,
+    )
 
     print("======= PROMPT =======")
     print(prompt)
     print("======================")
 
-    with open(CACHE_DIR / "prompt.txt", "w") as f:
+    with open(CACHE_DIR / "circle_packing_prompt.txt", "w") as f:
         f.write(prompt)
 
+def test_prompt_builder_with_task_prompt():
+    with open(CACHE_DIR / "circle_packing_program.pickle", "rb") as f:
+        program: ProgramImplementation = pickle.load(f)
+
+    extra_prompt_path = OPENEVOLVE_ROOT / "examples" / "circle_packing" / "prompt.txt"
+
+    with open(extra_prompt_path, "r") as f:
+        extra_prompt = f.read()
+
+    file_hierarchy = ProjectIndexer.get_tree_description(program)
+
+    prompt = build_prompt(
+        programs = [program],
+        file_hierarchy = file_hierarchy,
+        num_versions = 1,
+        extra_prompt = extra_prompt,
+    )
+
+    print("======= PROMPT =======")
+    print(prompt)
+    print("======================")
+
+    with open(CACHE_DIR / "circle_packing_prompt_extended.txt", "w") as f:
+        f.write(prompt)
+        
 def test_get_response():
     from openevolve.prompting.prompt import ROLE_PROMPT
 
@@ -92,7 +124,7 @@ def test_get_response():
         api_key=api_key,
     )
 
-    model = "gemini-2.0-flash-lite"
+    model = "gemini-2.0-flash"
     messages = [
         {"role": "system", "content": ROLE_PROMPT},
         {"role": "user", "content": prompt},

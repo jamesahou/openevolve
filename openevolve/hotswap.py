@@ -17,7 +17,6 @@ class NoImplementationSpecified(Exception):
 def get_relative_path(func: FunctionType, root: AbsPath) -> str:
     """Get the file path of the provided function relative to the project root."""
     absolute_path = inspect.getfile(func)
-    print(absolute_path)
     relative_path = str(Path(absolute_path).relative_to(root))
     return relative_path
 
@@ -151,6 +150,7 @@ def hotswap(func: FunctionType):
     #dynamic_func.__class__ = func.__class__
     #return local_vars["_dynamic_func"](*args, **kwargs)
     dynamic_func._openevolve_already_hotswapped = True
+    print(func_code)
 
     return dynamic_func
 

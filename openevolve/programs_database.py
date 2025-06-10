@@ -86,10 +86,12 @@ class ProgramsDatabase:
         self,
         config: config_lib.ProgramsDatabaseConfig,
         template: code_manipulation.Program,
+        extra_prompt: str | None = None,
         identifier: str = "",
     ) -> None:
         self._config: config_lib.ProgramsDatabaseConfig = config
         self._template: code_manipulation.Program = template
+        self._extra_prompt: str | None = extra_prompt
 
         self._last_reset_time: float = time.time()
         self._program_counter = 0
@@ -108,6 +110,7 @@ class ProgramsDatabase:
                     config.functions_per_prompt,
                     config.cluster_sampling_temperature_init,
                     config.cluster_sampling_temperature_period,
+                    extra_prompt=extra_prompt,
                 )
             )
         self._best_score_per_island: list[float] = [-float("inf")] * config.num_islands
@@ -243,12 +246,14 @@ class Island:
         functions_per_prompt: int,
         cluster_sampling_temperature_init: float,
         cluster_sampling_temperature_period: int,
+        extra_prompt: str | None = None,
     ) -> None:
         self._template: code_manipulation.Program = template
         self._file_hierarchy = file_hierarchy
         self._functions_per_prompt: int = functions_per_prompt
         self._cluster_sampling_temperature_init = cluster_sampling_temperature_init
         self._cluster_sampling_temperature_period = cluster_sampling_temperature_period
+        self._extra_prompt = extra_prompt
 
         self._clusters: dict[Signature, Cluster] = {}
         self._num_programs: int = 0
@@ -305,7 +310,12 @@ class Island:
         self, implementations: Sequence[code_manipulation.Program], num_versions: int
     ) -> str:
 
-        prompt = build_prompt(list(implementations), self._file_hierarchy, num_versions)
+        prompt = build_prompt(
+            programs=list(implementations),
+            file_hierarchy=self._file_hierarchy,
+            num_versions=num_versions,
+            extra_prompt=self._extra_prompt,
+        )
 
         return prompt
 

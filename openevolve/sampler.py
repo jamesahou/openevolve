@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 
 class vLLM:
     def __init__(
-        self, samples_per_prompt: int, url: str, model: str, log_path=None
+        self, samples_per_prompt: int, url: str, model: str, log_path=None, **inference_kwargs
     ):
         current_dir = Path(__file__).parent
         dotenv_path = current_dir.parent / '.env'
@@ -46,6 +46,7 @@ class vLLM:
         self.log_path = log_path
         self.model = model
         self.prompt_count = 0
+        self.inference_kwargs = inference_kwargs
         sys_prompt_path = current_dir / "systemprompt.txt"
         if sys_prompt_path.exists():
             with open(sys_prompt_path, "r") as f:
@@ -64,6 +65,7 @@ class vLLM:
                 ],
                 response_format=ProgramImplementation,
                 n=self.samples_per_prompt,
+                **self.inference_kwargs,
             )
         except:
             return []
@@ -127,7 +129,7 @@ if __name__ == "__main__":
     model = vLLM(
         samples_per_prompt=2,
         url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        model="gemini-2.0-flash-lite",
+        model="gemini-2.0-flash",
         log_path=Path("logs") 
     )
 

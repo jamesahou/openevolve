@@ -133,7 +133,12 @@ class ContainerSandbox(DummySandbox):
             )
 
             # Create the container from the built image
-            self.create_container(imps_root, openevolve_path)
+            self.create_container(
+                project_root,
+                imps_root,
+                eval_relpath,
+                openevolve_path,
+            )
 
         # Start the container if it is not already running
         self.start_container()
@@ -242,19 +247,30 @@ class ContainerSandbox(DummySandbox):
             )
 
     @classmethod
-    def create_container(cls, imps_root: HostAbsPath, openevolve_path: HostAbsPath | None = None):
+    def create_container(
+        cls,
+        project_root: HostAbsPath,
+        imps_root: HostAbsPath,
+        eval_relpath: HostRelPath,
+        openevolve_path: HostAbsPath | None = None,
+    ):
         """
         Creates a container from the built image.
         
         Args:
+            project_root (HostAbsPath): The absolute path to the project root on the host.
             imps_root (HostAbsPath): The absolute path to the implementations directory on the host (e.g. /tmp/...).
+            eval_relpath (HostRelPath): The relative path to the evaluation script within the project.
             openevolve_path (HostAbsPath | None): The absolute path to the OpenEvolve library on the host. If provided, it will be mounted in the container.
         """
         # Create the container
         logging.debug("Creating container from the built image...")
 
         # Mount the implementations directory from the host to /implementations in the container
-        mounts = [(imps_root, CONTAINER_IMPS_PATH, "readonly")]
+        mounts = [
+            (imps_root, CONTAINER_IMPS_PATH, "readonly"),
+            (project_root / eval_relpath, CONTAINER_EVAL_PATH, "readonly"),
+        ]
 
         is_editable = openevolve_path is not None
 
