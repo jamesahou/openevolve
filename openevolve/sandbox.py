@@ -118,7 +118,9 @@ class ContainerSandbox(DummySandbox):
 
         # Check if the container image already exists
         # If it does, we can skip the build step unless forced to rebuild
-        if force_rebuild_container or not self.container_exists():
+        needs_rebuild = force_rebuild_container or not self.container_exists()
+
+        if needs_rebuild:
             # If the container already exists, remove it
             self.remove_container()
 
@@ -137,8 +139,8 @@ class ContainerSandbox(DummySandbox):
         self.start_container()
 
         is_editable = openevolve_path is not None
-        
-        if is_editable:
+
+        if needs_rebuild and is_editable:
             # If the OpenEvolve library path is provided, install it in editable mode
             self.install_editable_openevolve()
 
