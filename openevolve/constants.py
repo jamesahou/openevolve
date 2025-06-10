@@ -2,6 +2,8 @@
 from openevolve.custom_types import ContainerAbsPath
 from pathlib import Path
 
+LIBRARY_NAME = "openevolve"
+
 HOTSWAP_ENVVAR = "OPENEVOLE_HOTSWAP_IMP"
 
 # Absolute paths in the container file system

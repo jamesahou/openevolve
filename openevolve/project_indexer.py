@@ -160,4 +160,4 @@ class ProjectIndexer:
         for function in program.functions:
             subtree.insert_function(function)
 
-        return subtree.pretty_print()
+        return subtree.pretty_print().rstrip()

@@ -14,6 +14,7 @@ from typing import List, Any
 from openevolve.structured_outputs import ProgramImplementation, FunctionImplementation
 from openevolve.custom_types import FullName, FuncMeta, HostAbsPath, HostRelPath
 from openevolve.test_case import TestCase
+from openevolve.hotswap import apply_decorator, remove_decorator, import_openevolve, unimport_openevolve
 
 builtins._dbg_storage = dict(
     fns_to_evolve=[],
@@ -349,86 +350,49 @@ class Extractor:
     def add_decorators(
         self,
         program_meta: dict[FullName, FuncMeta],
-        decorator: str = "@openevolve.hotswap",
-        lib: str = "openevolve"
+        decorator: str = "openevolve.hotswap",
     ):
         """
-        Edit the original file to add the specified decorator to the functions.
-        Import openevolve at the top of the file.
-        Handles line number shifting if multiple decorators are added to the same file.
+        Edit the original file to add the specified decorator to the functions using AST manipulation.
+        Import openevolve at the top of the file if not present.
         """
-        # Group by file
-        from collections import defaultdict
-        file_to_funcs = defaultdict(list)
-        for fullname, meta in program_meta.items():
-            file_to_funcs[meta.file_path].append((fullname, meta))
+        file_to_targets = {}
+        for function in program_meta.values():
+            file_to_targets.setdefault(function.file_path, []).append(function.qualname)
+        
+        for fpath, qualnames in file_to_targets.items():
+            with open(self.base_dir / fpath) as f:
+                f_str = f.read()
+                
+            file_ast = ast.parse(f_str)
+            
+            import_openevolve(file_ast)
+            
+            for qualname in qualnames:
+                apply_decorator(file_ast, qualname, decorator)
 
-        for file_path, funcs in file_to_funcs.items():
-            abs_file_path = self.base_dir / file_path
-            if not abs_file_path.exists():
-                continue
-            with open(abs_file_path, "r") as f:
-                lines = f.readlines()
-
-            # Sort by line_no so we insert from top to bottom
-            funcs.sort(key=lambda x: x[1].line_no)
-            offset = 0
-            inserted_lines = set()
-            for fullname, meta in funcs:
-                line_no = meta.line_no - 1 + offset  # Adjust for previous insertions
-                # Prevent double-inserting at the same line (e.g. for nested functions)
-                if line_no in inserted_lines:
-                    continue
-                indent = " " * (len(lines[line_no]) - len(lines[line_no].lstrip()))
-                lines.insert(line_no, f"{indent}{decorator}\n")
-                offset += 1
-                inserted_lines.add(line_no)
-
-            # import openevolve under __future__ imports, otherwise at the top of the file
-            has_lib_import = any(f"import {lib}" in line for line in lines)
-            if not has_lib_import:
-                future_import_index = -1
-                for i, line in enumerate(lines):
-                    if line.startswith("from __future__ import") or line.startswith("import __future__"):
-                        future_import_index = i
-                        break
-                if future_import_index != -1:
-                    lines.insert(future_import_index + 1, f"import {lib}\n")
-                else:
-                    lines.insert(0, f"import {lib}\n\n")
-
-            with open(abs_file_path, "w") as f:
-                f.writelines(lines)
-
-            print(f"Added decorators to {abs_file_path}")
+            with open(self.base_dir / fpath, 'w') as f:
+                f.write(ast.unparse(file_ast))
 
     def remove_decorators(
         self,
         program_meta: dict[FullName, FuncMeta],
-        decorator="@openevolve.hotswap"
+        decorator: str ="openevolve.hotswap"
     ):
-        """
-        Edit the original file to remove the specified decorator from the functions.
-        """
-        for fullname, meta in program_meta.items():
-            abs_file_path = self.base_dir / meta.file_path
-            if not abs_file_path.exists():
-                continue
-            with open(abs_file_path, "r") as f:
-                lines = f.readlines()
+        file_to_targets = {}
+        for function in program_meta.values():
+            file_to_targets.setdefault(function.file_path, []).append(function.qualname)
+        
+        for fpath, qualnames in file_to_targets.items():
+            with open(self.base_dir / fpath) as f:
+                f_str = f.read()
+                
+            file_ast = ast.parse(f_str)
+            
+            unimport_openevolve(file_ast)
+                
+            for qualname in qualnames:
+                remove_decorator(file_ast, qualname, decorator)
 
-            decorator_lines = []
-            for i, line in enumerate(lines):
-                if decorator in line.strip():
-                    decorator_lines.append(i)
-
-            for line_no in decorator_lines:
-                lines[line_no] = "\n"
-
-            with open(abs_file_path, "w") as f:
-                f.writelines(lines)
-
-            print(f"Removed decorator from {abs_file_path} at line {line_no + 1}")
-
-if __name__ == "__main__":
-    tests = [TestCase(args=[], kwargs={})]
+            with open(self.base_dir / fpath, 'w') as f:
+                f.write(ast.unparse(file_ast))

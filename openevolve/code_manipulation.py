@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List
 from dataclasses import dataclass
 from enum import Enum
 
+
 from openevolve.structured_outputs import ProgramImplementation
 from openevolve.custom_types import FullName, FuncMeta, RelPath
 
@@ -34,6 +35,45 @@ class Decorator(Enum):
     STATICMETHOD = "staticmethod"
     PROPERTY = "property"
 
+class ImportRemover(ast.NodeTransformer):
+    def visit_Import(self, node):
+        return None
+
+    def visit_ImportFrom(self, node):
+        return None
+
+    def generic_visit(self, node):
+        # Recursively visit all child nodes
+        for field, value in ast.iter_fields(node):
+            if isinstance(value, list):
+                new_values = []
+                for item in value:
+                    if isinstance(item, ast.AST):
+                        item = self.visit(item)
+                        if item is None:
+                            continue
+                    new_values.append(item)
+                setattr(node, field, new_values)
+            elif isinstance(value, ast.AST):
+                new_node = self.visit(value)
+                setattr(node, field, new_node)
+        return node
+
+def remove_imports_from_function_code(function_code: str) -> str:
+    """
+    Remove all import statements (absolute and relative, at any nesting level) from the given Python function code string.
+
+    Args:
+        function_code (str): The string representation of a Python function.
+
+    Returns:
+        str: The function code with all import statements removed.
+    """
+    tree = ast.parse(function_code)
+    tree = ImportRemover().visit(tree)
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
 @dataclass
 class Function:
     """A parsed Python function."""
@@ -53,7 +93,7 @@ class Function:
         indented_body = textwrap.indent(body, "    ")
         return f"{header_str}\n{indented_body}"
 
-    def to_str(self, version: int | None = None) -> str:
+    def to_str(self, version: int | None = None, remove_imports: bool = False) -> str:
         """Return the function as a string.
         If *version* is given, the function name in the header is suffixed with
         ``_v<version>`` (e.g. ``def foo()`` → ``def foo_v1()``).  Otherwise this is
@@ -68,7 +108,12 @@ class Function:
         )
         body = self.body.strip()
         indented_body = textwrap.indent(body, "    ")
-        return f"{header_copy}\n{indented_body}"
+        code = f"{header_copy}\n{indented_body}"
+
+        if remove_imports:
+            code = remove_imports_from_function_code(code)
+            
+        return code
 
     def __setattr__(self, name: str, value: str) -> None:
         # Ensure there aren't leading & trailing new lines in `body`.
@@ -235,11 +280,3 @@ def structured_output_to_prog_meta(
         func.qualname = meta.qualname
 
     return Program(functions=list(functions.values()))
-  
-
-
-
-
-    
-
-  
