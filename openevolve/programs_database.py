@@ -30,6 +30,7 @@ import scipy
 from openevolve import code_manipulation
 from openevolve import config as config_lib
 from openevolve.project_indexer import ProjectIndexer
+from openevolve.prompting.prompt import build_prompt
 
 Signature = tuple[float, ...]
 ScoresPerTest = Mapping[Any, float]
@@ -298,27 +299,13 @@ class Island:
         indices = np.argsort(scores)
         sorted_implementations = [implementations[i] for i in indices]
         version_generated = len(sorted_implementations) + 1
-        return self._generate_prompt(sorted_implementations), version_generated
+        return self._generate_prompt(sorted_implementations, len(sorted_implementations)), version_generated
 
     def _generate_prompt(
-        self, implementations: Sequence[code_manipulation.Program]
+        self, implementations: Sequence[code_manipulation.Program], num_versions: int
     ) -> str:
-        implementations = copy.deepcopy(implementations)
-        prompt = f"# File Hierarchy \n{self._file_hierarchy}\n\n"
-        for program_version, implementation in enumerate(implementations):
-            prompt += f"# Start of Program  Version {program_version} (*_v{program_version})\n"
-            if program_version >= 1:
-                prompt += f"# This is an improved version of the previous program (*_v{program_version - 1})\n\n"
 
-            for function in implementation.functions:
-                path = function.path
-                func_loc_comment = f"#{path}: {function.qualname} ({function.decorator if function.decorator else ''}\n)"
-                prompt += f"{func_loc_comment}\n"
-
-                func_str = function.to_str(version=program_version)
-                prompt += f"{func_str}\n\n"
-
-            prompt += f"# End of Program Version {program_version}\n\n"
+        prompt = build_prompt(list(implementations), self._file_hierarchy, num_versions)
 
         return prompt
 

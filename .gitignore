@@ -27,4 +27,5 @@ MANIFEST
 .venv
 
 imps
+data
 cache

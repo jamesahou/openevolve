@@ -10,7 +10,7 @@ class FunctionImplementation(BaseModel):
         description="The path to the file containing the function implementation."
     )
     qualname: str = Field(
-        description="The qualified name of the function (e.g. MyClass.myfunction)."
+        description="The qualified name of the function. DO NOT INCLUDE THE VERSION SUFFIX."
     )
     code: str = Field(
         description="The source code of the function implementation, including the header and body."

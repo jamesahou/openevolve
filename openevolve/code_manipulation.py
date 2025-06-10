@@ -1,3 +1,4 @@
+import logging
 import textwrap
 import ast
 
@@ -19,8 +20,8 @@ class FuncHeader:
 
     def __str__(self) -> str:
         """Return the function header as a string."""
-        args = sorted(self.args, key=lambda x: (x != "self", x))
-        args = ", ".join(args)
+        # args = sorted(self.args, key=lambda x: (x != "self", x))
+        args = ", ".join(self.args)
         if self.return_type:
             return f"def {self.name}({args}) -> {self.return_type}:"
         else:
@@ -101,6 +102,7 @@ class Function:
         """
         if version is None:
             return str(self)
+        
         header_copy = FuncHeader(
             name=f"{self.header.name}_v{version}",
             args=list(self.header.args),
@@ -252,26 +254,48 @@ def header_from_str(header_str: str) -> FuncHeader:
 def structured_output_to_prog_meta(
     structured_output: ProgramImplementation,
     program_meta: Dict[FullName, FuncMeta],
+    version: int
 ) -> Program:
     """Given a structured output from the LLM and program metadata, returns a Program object."""
 
     # Check if the sample contains all the expected keys
     expected_keys = set(program_meta.keys())
-    actual_keys = {f.filepath + ' ' + f.qualname for f in structured_output.functions}
+    actual_keys = set()
+    for f in structured_output.functions:
+        fname = (f.qualname).replace(f"_v{version-1}", "")
+        fullname = f.filepath + " " + fname
+        actual_keys.add(fullname)
+    
     if expected_keys != actual_keys:
-        raise ValueError(
-            f"Expected keys {expected_keys} but got {actual_keys} in structured output."
-        )
+        missing_keys = expected_keys - actual_keys
+        extra_keys = actual_keys - expected_keys
+
+        for key in missing_keys:
+            logging.error(f"Missing expected function: {key}")
+        for key in extra_keys:
+            logging.error(f"Extra function found: {key}")
+
+        raise ValueError(f"Structured output does not match expected function metadata.")
     
     functions = structured_output_to_functions(structured_output)
     
     # check if headers are same
+    """
     expected_headers = {str(header_from_str(meta.header)) for meta in program_meta.values()}
     actual_headers = {str(func.header) for func in functions.values()}
+
     if expected_headers != actual_headers:
-        raise ValueError(
-            f"Expected headers {expected_headers} but got {actual_headers} in structured output."
-        )
+        missing_headers = expected_headers - actual_headers
+        extra_headers = actual_headers - expected_headers
+
+        for header in missing_headers:
+            logging.error(f"Missing expected header: {header}")
+
+        for header in extra_headers:
+            logging.error(f"Extra header found: {header}")
+
+        raise ValueError(f"Function headers do not match expected headers.")
+    """
     
     # Set the metadata for each function
     for func in functions.values():

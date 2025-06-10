@@ -103,7 +103,10 @@ def run(
     tests: List[TestCase] = cloudpickle.load(open(tests_file, "rb"))
     assert len(tests) > 0, "No tests found in the provided tests file."
 
-    imps_path = Path(tempfile.mkdtemp(suffix=f"_impementations_{timestamp}"))
+    imps_path = pathlib.Path(__file__).parent.parent / "imps"
+    os.makedirs(imps_path, exist_ok=True)
+
+    # imps_path = Path(tempfile.mkdtemp(suffix=f"_impementations_{timestamp}"))
     logging.info(f"Using temporary directory for implementations: {imps_path}")
 
     eval_file = pathlib.Path(eval_file)
@@ -129,7 +132,7 @@ def run(
     ImplementationsManager.set_program_meta(program_meta)
 
     template = code_manipulation.structured_output_to_prog_meta(
-        initial_program, program_meta
+        initial_program, program_meta, 0
     )
     ex.add_decorators(program_meta)
 
@@ -153,7 +156,7 @@ def run(
             for _ in range(conf.num_evaluators)
         ]
         # We send the initial implementation to be analysed by one of the evaluators.
-        evaluators[0].analyse(initial_program, island_id=None, implementation_id="initial")
+        evaluators[0].analyse(initial_program, 0, island_id=None, implementation_id="0",)
         assert len(database._islands[0]._clusters) > 0, (
             "Initial analysis failed. Make sure that Sandbox works! "
             "See e.g. the error files under sandbox data."

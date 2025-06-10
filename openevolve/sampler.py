@@ -35,12 +35,12 @@ class vLLM:
         self, samples_per_prompt: int, url: str, model: str, log_path=None
     ):
         current_dir = Path(__file__).parent
-        dotenv_path = current_dir / '.env'
+        dotenv_path = current_dir.parent / '.env'
         if dotenv_path.exists():
             load_dotenv(dotenv_path)
         self.key = os.getenv('API_KEY', '') 
         if not self.key:
-            raise ValueError("API key not found. Please set the OPENAI_API_KEY environment variable.")
+            raise ValueError("API key not found. Please set the API_KEY environment variable.")
         self.client = OpenAI(api_key=self.key, base_url=url)
         self.samples_per_prompt = samples_per_prompt
         self.log_path = log_path
@@ -55,15 +55,18 @@ class vLLM:
         
     def draw_samples(self, prompt: str) -> list[ProgramImplementation | None]:
         """Batch processes multiple prompts at once."""
-        responses = self.client.beta.chat.completions.parse(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            response_format=ProgramImplementation,
-            n=self.samples_per_prompt,
-        )
+        try:
+            responses = self.client.beta.chat.completions.parse(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=ProgramImplementation,
+                n=self.samples_per_prompt,
+            )
+        except:
+            return []
         response_msgs = [choice.message.parsed for choice in responses.choices]
         for msg in response_msgs:
             self._log(prompt, msg)
@@ -98,30 +101,18 @@ class Sampler:
     def sample(self):
         """Continuously gets prompts, samples programs, sends them for analysis."""
         # Time getting prompt
-        t0 = time.time()
         prompt = self._database.get_prompt()
-        t1 = time.time()
-        prompt_time = t1 - t0
 
-        # Time LLM sampling
-        t0 = time.time()
         samples = self._llm.draw_samples(prompt.code)
-        t1 = time.time()
-        llm_time = t1 - t0
 
-        # Time evaluation
-        eval_times = []
         for sample in samples:
             curr_id = str(self.uid) + "_" + str(self.generation_number)
             self.generation_number += 1
-            t0 = time.time()
             chosen_evaluator = np.random.choice(self._evaluators)
-            chosen_evaluator.analyse(sample, prompt.island_id, curr_id)
-            t1 = time.time()
-            eval_times.append(t1 - t0)
-
-        # Log timing results
-        avg_eval_time = sum(eval_times) / len(eval_times)
+            try:
+                chosen_evaluator.analyse(sample, prompt.version_generated, prompt.island_id,  curr_id)
+            except ValueError as e:
+                logging.warning(e)
 
 if __name__ == "__main__":
     from pathlib import Path
