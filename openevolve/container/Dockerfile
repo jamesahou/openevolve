@@ -55,7 +55,9 @@ RUN git clone https://github.com/jamesahou/openevolve.git /home/openevolve
 
 # Install OpenEvolve
 RUN cd /home/openevolve && \
-    pip install -e .
+    pip install .
+
+RUN rm -rf /home/openevolve/
 
 RUN mkdir /home/inputs
 RUN mkdir /home/outputs
@@ -63,10 +65,10 @@ RUN mkdir /home/logs
 
 WORKDIR /home/workspace
 
-RUN if [ -z "$SETUP_FILE" ]; then \
+RUN if [ -z "$SETUP_RELPATH" ]; then \
         echo "No setup file provided."; \
     else \
-        echo "Using setup file: $SETUP_FILE" && \
+        echo "Using setup file: $SETUP_RELPATH" && \
         cd /home/workspace && \
         /bin/bash /home/setup.sh; \
     fi

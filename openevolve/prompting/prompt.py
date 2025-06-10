@@ -2,6 +2,7 @@ from openevolve.project_indexer import ProjectIndexer
 from openevolve.code_manipulation import Program
 
 from pathlib import Path
+import ast
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -57,7 +58,7 @@ def build_prompt(program: Program) -> str:
     for function in program.functions:
         func_fullname_comment = f"# {function.path}: {function.qualname}\n"
         prompt += f"{func_fullname_comment}"
-        prompt += f"{function.to_str(version=0)}\n\n"
+        prompt += f"{function.to_str(version=0, remove_imports=True)}\n\n"
 
     prompt += "### END OF PROGRAM VERSION 0 ###\n"
     

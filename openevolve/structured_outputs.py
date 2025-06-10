@@ -13,7 +13,7 @@ class FunctionImplementation(BaseModel):
         description="The qualified name of the function (e.g. MyClass.myfunction)."
     )
     code: str = Field(
-        description="The source code of the function implementation."
+        description="The source code of the function implementation, including the header and body."
     )
 
 class ProgramImplementation(BaseModel):

@@ -465,6 +465,12 @@ class ContainerSandbox(DummySandbox):
         """
         output_filepath, retcode = self.execute(implementation_id, test_id, timeout)
 
+        if retcode != 0:
+            raise RuntimeError(
+                f"Failed to execute the implementation {implementation_id} for test case {test_id} in the container {SANDBOX_CONTAINER_NAME}. "
+                "Please check the container engine and the output path."
+            )
+            
         # Create a temporary file to store the output
         output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pickle")
         

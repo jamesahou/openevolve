@@ -8,11 +8,12 @@ import cloudpickle
 
 import click
 from openai import OpenAI
-
+import shutil
 from dotenv import load_dotenv
 from typing import List
 from openevolve.test_case import TestCase
-
+from openevolve.evaluator import ImplementationsManager
+from pathlib import Path
 import tempfile
 
 from openevolve.custom_types import (
@@ -101,23 +102,36 @@ def run(
     tests: List[TestCase] = cloudpickle.load(open(tests_file, "rb"))
     assert len(tests) > 0, "No tests found in the provided tests file."
 
-    imps_path = tempfile.mkdtemp(suffix=f"_impementations_{timestamp}")
+    imps_path = Path(tempfile.mkdtemp(suffix=f"_impementations_{timestamp}"))
     logging.info(f"Using temporary directory for implementations: {imps_path}")
 
     eval_file = pathlib.Path(eval_file)
 
     ex: extractor.Extractor = extractor.Extractor(project_root, eval_file)
 
-    initial_program, path, program_meta = ex.run(tests[0], evolve_depth)
-    if path is None:
-        raise ValueError(
-            "No initial program found. Make sure that the eval_file is correct and contains a valid program."
-        )
+    #initial_program, path, program_meta = ex.run(tests[0], evolve_depth)
+    #if path is None:
+    #    raise ValueError(
+    #        "No initial program found. Make sure that the eval_file is correct and contains a valid program."
+    #    )
+
+    # Load initial_program and program_meta from the cache directoy
+    cache_dir = pathlib.Path(__file__).parent.parent / "cache"
+
+    with open(cache_dir / "spec_structured.pickle", "rb") as f:
+        initial_program: extractor.ProgramImplementation = cloudpickle.load(f)
+    with open(cache_dir / "program_meta.pickle", "rb") as f:
+        program_meta: dict[str, extractor.FuncMeta] = cloudpickle.load(f)
+
+    ImplementationsManager.set_workspace_root(project_root)
+    ImplementationsManager.set_implementations_root(imps_path)
+    ImplementationsManager.set_program_meta(program_meta)
 
     template = code_manipulation.structured_output_to_prog_meta(
         initial_program, program_meta
     )
     ex.add_decorators(program_meta)
+
     try:
         conf = config.Config(num_evaluators=1)
         database = programs_database.ProgramsDatabase(
@@ -127,10 +141,10 @@ def run(
             database.load(load_backup)
 
         sbox = sandbox.ContainerSandbox(
-            project_root, imps_path, eval_file, setup_file=setup_file
+            project_root, imps_path, eval_file, setup_file, force_rebuild_container = True
         )
         evaluators = [
-            evaluator.AsyncEvaluator(
+            evaluator.Evaluator(
                 database,
                 sbox,
                 tests,
@@ -138,7 +152,7 @@ def run(
             for _ in range(conf.num_evaluators)
         ]
         # We send the initial implementation to be analysed by one of the evaluators.
-        evaluators[0].analyse(initial_program, island_id=None, implementation_id="-1")
+        evaluators[0].analyse(initial_program, island_id=None, implementation_id="initial")
         assert len(database._islands[0]._clusters) > 0, (
             "Initial analysis failed. Make sure that Sandbox works! "
             "See e.g. the error files under sandbox data."
@@ -158,6 +172,9 @@ def run(
         core.run(samplers, database, iterations)
     finally:
         ex.remove_decorators(program_meta)
+
+        #if os.path.exists(imps_path):
+        #    shutil.rmtree(imps_path)
 
 
 if __name__ == "__main__":

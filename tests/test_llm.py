@@ -39,23 +39,23 @@ def test_extractor():
 
     spec_structured, path, program_meta = extactor.run(test_case)
 
-    with open(CACHE_DIR / "spec_structured.pkl", "wb") as f:
+    with open(CACHE_DIR / "spec_structured.pickle", "wb") as f:
         pickle.dump(spec_structured, f)
 
-    with open(CACHE_DIR / "program_meta.pkl", "wb") as f:
+    with open(CACHE_DIR / "program_meta.pickle", "wb") as f:
         pickle.dump(program_meta, f)
 
 def test_call_tree():
-    with open(CACHE_DIR / "spec_structured.pkl", "rb") as f:
+    with open(CACHE_DIR / "spec_structured.pickle", "rb") as f:
         spec_structured: ProgramImplementation = pickle.load(f)
 
-    with open(CACHE_DIR / "program_meta.pkl", "rb") as f:
+    with open(CACHE_DIR / "program_meta.pickle", "rb") as f:
         program_meta: dict[str, FuncMeta] = pickle.load(f)
 
     program = code_manipulation.structured_output_to_prog_meta(spec_structured, program_meta)
     file_hierarchy = ProjectIndexer.get_tree_description(program)
 
-    with open(CACHE_DIR / "program.pkl", "wb") as f:
+    with open(CACHE_DIR / "program.pickle", "wb") as f:
         pickle.dump(program, f)
 
     with open(CACHE_DIR / "file_hierarchy.txt", "w") as f:
@@ -67,7 +67,7 @@ def test_call_tree():
     print("======================")
     
 def test_prompt_builder():
-    with open(CACHE_DIR / "program.pkl", "rb") as f:
+    with open(CACHE_DIR / "program.pickle", "rb") as f:
         program: ProgramImplementation = pickle.load(f)
 
     prompt = build_prompt(program)
@@ -112,7 +112,7 @@ def test_get_response():
         "model": model,
         "messages": messages,
         "response_format": response_format,
-        "completion": completion,
+        "response": results,
     }
 
     # Ensure the api cache directory exists
@@ -120,7 +120,7 @@ def test_get_response():
     os.makedirs(api_cache_dir, exist_ok=True)
 
     # Find the next available index
-    existing_files = [f for f in os.listdir(api_cache_dir) if f.startswith("response_") and f.endswith(".json")]
+    existing_files = [f for f in os.listdir(api_cache_dir) if f.startswith("response_") and f.endswith(".pickle")]
     indices = []
     for fname in existing_files:
         try:
@@ -134,5 +134,16 @@ def test_get_response():
     with open(api_cache_dir / f"response_{next_index}.pickle", "wb") as file:
         pickle.dump(api_call, file)
 
-    for function in results.functions:
-        print(function.code)
+def test_analyze_response():
+    with open(CACHE_DIR / "api" / "response_9.pickle", "rb") as f:
+        api_call = pickle.load(f)
+
+    response: ProgramImplementation = api_call["response"]
+
+    print("=== ANALYZING RESPONSE ===")
+    for function in response.functions:
+        print(f"Filepath: {function.filepath}")
+        print(f"Qualified Name: {function.qualname}")
+        print(f"Code:\n{function.code}")
+        print("--------------------------")
+        print()
