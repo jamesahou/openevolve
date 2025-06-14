@@ -36,6 +36,8 @@ OpenEvolve is an open-source framework for evolutionary program synthesis, inspi
 
 ## Installation
 
+OpenEvolve requires Docker to run ([install instructions](https://docs.docker.com/engine/install/)). For the remaining requirements, please follow the steps:
+
 ```bash
 # Clone the repository
 git clone https://github.com/ryanrudes/openevolve.git
